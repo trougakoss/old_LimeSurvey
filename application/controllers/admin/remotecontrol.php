@@ -171,6 +171,45 @@ class remotecontrol_handle
         }
     } 
 
+    /**
+     * XML-RPC routine to get survey properties
+     * Properties are those defined in tables surveys and surveys_language_settings
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @param string $sproperty_name
+	 * @param string $slang
+     * @return string
+     */
+   public function get_survey_properties($session_key,$sid, $sproperty_name, $slang='')
+    {
+       if ($this->_checkSessionKey($session_key))
+       { 
+		$surveyidExists = Survey::model()->findByPk($sid);		   
+		if (!isset($surveyidExists))
+		{
+			throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);
+			exit;
+		}		   
+		if (hasSurveyPermission($sid, 'survey', 'read'))
+            {
+                $basic_attrs = Survey::model()->findByPk($sid)->getAttributes();
+                if ($slang == '')
+					$slang = $basic_attrs['language'];
+				$lang_attrs = Surveys_languagesettings::model()->findByAttributes(array('surveyls_survey_id' => $sid, 'surveyls_language' => $slang))->getAttributes();	
+				
+				if (isset($basic_attrs[$sproperty_name]))
+					return $basic_attrs[$sproperty_name];
+				elseif (isset($lang_attrs[$sproperty_name]))
+					return $lang_attrs[$sproperty_name];
+				else
+					throw new Zend_XmlRpc_Server_Exception('Data not available', 23);
+            }
+        else
+			throw new Zend_XmlRpc_Server_Exception('No permission', 2);  
+        }
+    } 
 
     /**
      * XML-RPC routine to delete a survey
