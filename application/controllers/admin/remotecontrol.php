@@ -146,6 +146,33 @@ class remotecontrol_handle
     }
 
     /**
+     * XML-RPC routine to get settings
+     *
+     * @access public
+     * @param string $session_key
+     * @param string $settting_name
+     * @return string
+     */
+   public function get_site_settings($session_key,$setting_name)
+    {
+       if ($this->_checkSessionKey($session_key))
+       {
+		   if( Yii::app()->session['USER_RIGHT_SUPERADMIN'] == 1)
+		   {     
+			   if (Yii::app()->getRegistry($setting_name) !== false)
+					return Yii::app()->getRegistry($setting_name);
+				elseif (Yii::app()->getConfig($setting_name) !== false)
+					return Yii::app()->getConfig($setting_name);
+				else
+					throw new Zend_XmlRpc_Server_Exception('Invalid setting', 20);	
+			}
+			else
+				throw new Zend_XmlRpc_Server_Exception('No permission', 2); 	
+        }
+    } 
+
+
+    /**
      * XML-RPC routine to delete a survey
      *
      * @access public
