@@ -430,6 +430,53 @@ class remotecontrol_handle
     }
 
     /**
+     * XML-RPC routing to to return unused Tokens as String.
+     * Returns the unused tokens in an Array.
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @return array
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function token_return($session_key, $sid)
+	{
+		
+        if ($this->_checkSessionKey($session_key))
+        {
+			if(!isset($sid) || $sid=='' || $sid==0 )
+			{
+                throw new Zend_XmlRpc_Server_Exception('Faulty parameters', 21);
+                exit;
+			}
+
+			$surveyidExists = Survey::model()->findByPk($sid);
+			if (!isset($surveyidExists))
+			{
+				throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);
+				exit;
+			}		
+				
+			if(!tableExists("{{tokens_$sid}}"))
+			{
+				throw new Zend_XmlRpc_Server_Exception('No token table', 11);
+				exit;
+			}
+
+			$tokens = Tokens_dynamic::model($sid)->findAll("completed = 'N'");
+			if(count($tokens)==0)
+				throw new Zend_XmlRpc_Server_Exception('No unused Tokens found', 30);
+			
+			foreach ($tokens as $token)
+				{
+					$aData[] = $token->attributes['token'];
+				}
+			return $aData;
+        }			
+	}
+	
+
+    /**
      * XML-RPC routine to add a participant to a token table
      * Returns the inserted data including additional new information like the Token entry ID and the token
      *
