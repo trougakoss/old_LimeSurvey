@@ -362,6 +362,60 @@ class remotecontrol_handle
     } 
 
     /**
+     * XML-RPC routine to activate a survey
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @param string dStart
+     * @param string dEnd
+     * @return string|bool
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+    public function activate_survey($session_key, $sid, $dStart='', $dEnd='')
+    {
+		Yii::app()->loadHelper('admin/activate');
+		
+		if ($this->_checkSessionKey($session_key))
+        {
+			$surveyidExists = Survey::model()->findByPk($sid);
+			if (!isset($surveyidExists))
+			{
+				throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);
+				exit;
+			}				
+            if (hasSurveyPermission($sid, 'survey', 'update'))
+            {
+				//Start and end dates are updated regardless the survey's status
+				if($dStart!='' && substr($dStart,0,10)!='1980-01-01' && $this->_internal_validate('startdate', $dStart) )
+				{
+					Survey::model()->updateByPk($sid, array('startdate'=> $dStart));
+				}
+				if($dEnd!='' && substr($dEnd,0,10)!='1980-01-01' && $this->_internal_validate('expires', $dEnd))
+				{
+					Survey::model()->updateByPk($sid, array('expires'=> $dEnd));
+				}	
+				
+				$survey_attributes = Survey::model()->findByPk($sid)->getAttributes();
+				if ($survey_attributes['active'] == 'N')
+				{
+					$activateResult = activateSurvey($sid);
+					if ($activateResult==false)
+						throw new Zend_XmlRpc_Server_Exception('Activation went wrong', 32);	
+				}
+				else 
+					throw new Zend_XmlRpc_Server_Exception('Survey is active', 31);
+					
+				return $sid;
+							
+            }
+            else
+                throw new Zend_XmlRpc_Server_Exception('No permission', 2);			
+		}	
+	}
+
+
+    /**
      * XML-RPC routine to delete a survey
      *
      * @access public
