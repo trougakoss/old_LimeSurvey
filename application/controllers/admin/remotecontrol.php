@@ -194,20 +194,91 @@ class remotecontrol_handle
 		}		   
 		if (hasSurveyPermission($sid, 'survey', 'read'))
             {
-                $basic_attrs = Survey::model()->findByPk($sid)->getAttributes();
+                $abasic_attrs = Survey::model()->findByPk($sid)->getAttributes();
                 if ($slang == '')
-					$slang = $basic_attrs['language'];
-				$lang_attrs = Surveys_languagesettings::model()->findByAttributes(array('surveyls_survey_id' => $sid, 'surveyls_language' => $slang))->getAttributes();	
+					$slang = $abasic_attrs['language'];
+				$alang_attrs = Surveys_languagesettings::model()->findByAttributes(array('surveyls_survey_id' => $sid, 'surveyls_language' => $slang))->getAttributes();	
 				
-				if (isset($basic_attrs[$sproperty_name]))
-					return $basic_attrs[$sproperty_name];
-				elseif (isset($lang_attrs[$sproperty_name]))
-					return $lang_attrs[$sproperty_name];
+				if (isset($abasic_attrs[$sproperty_name]))
+					return $abasic_attrs[$sproperty_name];
+				elseif (isset($alang_attrs[$sproperty_name]))
+					return $alang_attrs[$sproperty_name];
 				else
 					throw new Zend_XmlRpc_Server_Exception('Data not available', 23);
             }
         else
 			throw new Zend_XmlRpc_Server_Exception('No permission', 2);  
+        }
+    } 
+
+    /**
+     * XML-RPC routine to set survey properties
+     * Properties are those defined in tables surveys and surveys_language_settings
+     * In case survey is activated, certain properties are not allowed to change
+     * 
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @param string $sproperty_name
+     * @param string $sproperty_value
+	 * @param string $slang
+     * @return array
+     */
+   public function set_survey_properties($session_key,$sid, $sproperty_name, $sproperty_value, $slang='')
+    {
+       if ($this->_checkSessionKey($session_key))
+       { 
+		$surveyidExists = Survey::model()->findByPk($sid);
+		if (!isset($surveyidExists))
+		{
+			throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);
+			exit;
+		}		   
+		if (hasSurveyPermission($sid, 'survey', 'update'))
+            {
+				$valid_value = $this->_internal_validate($sproperty_name, $sproperty_value);
+				
+				if (!$valid_value)
+				{
+					throw new Zend_XmlRpc_Server_Exception('Update values are not valid', 24);
+					exit;
+				}
+					
+				$ocurrent_Survey = Survey::model()->findByPk($sid);				
+                $abasic_attrs = $ocurrent_Survey->getAttributes();
+
+                if ($slang == '')
+					$slang = $abasic_attrs['language'];
+					
+				$ocurrent_Survey_languagesettings = Surveys_languagesettings::model()->findByAttributes(array('surveyls_survey_id' => $sid, 'surveyls_language' => $slang));		
+				$alang_attrs = $ocurrent_Survey_languagesettings->getAttributes();
+
+				$active = $abasic_attrs['active'];	
+				$adissallowed = array('language', 'additional_languages', 'attributedescriptions', 'surveyls_survey_id', 'surveyls_language');					
+				if ($active == 'Y')
+					array_push($adissallowed, 'active', 'anonymized', 'savetimings', 'datestamp', 'ipaddr','refurl');
+					
+				if (!in_array($sproperty_name, $adissallowed))
+				{
+					if (array_key_exists($sproperty_name, $abasic_attrs))
+					{
+						$ocurrent_Survey->setAttribute($sproperty_name,$valid_value);
+						return $ocurrent_Survey->save();
+					}
+					elseif (array_key_exists($sproperty_name, $alang_attrs))
+					{
+						$ocurrent_Survey_languagesettings->setAttribute($sproperty_name,$valid_value);
+						return $ocurrent_Survey_languagesettings->save();	
+					}
+					else
+						throw new Zend_XmlRpc_Server_Exception('No such property', 25);						
+				}
+				else
+					throw new Zend_XmlRpc_Server_Exception('Property not editable', 26);	
+            }
+        else
+			throw new Zend_XmlRpc_Server_Exception('No permission', 2); 
+			
         }
     } 
 
@@ -490,4 +561,117 @@ class remotecontrol_handle
             return true;
         }
     }
+    
+    /**
+     * This function validates parameters to be inserted in survey model
+     *
+     * @access protected
+     * @param string $sparam_name
+     * @param string $sparam_value
+     * @return bool|string
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+    protected function _internal_validate($sparam_name, $sparam_value)
+    {   	
+		$date_pattern = '/^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$/';
+		$validation_categories = array(
+								'active'=>'char',
+								'anonymized'=>'char',
+								'savetimings'=>'char',
+								'datestamp'=>'char',
+								'ipaddr'=>'char',
+								'refurl'=>'char',
+								'usecookie'=>'char',
+								'allowregister'=>'char',
+								'allowsave'=>'char',
+								'autoredirect'=>'char',
+								'allowprev'=>'char',
+								'printanswers'=>'char',
+								'publicstatistics'=>'char',
+								'publicgraphs'=>'char',
+								'listpublic'=>'char',
+								'htmlemail'=>'char',
+								'sendconfirmation'=>'char',
+								'tokenanswerspersistence'=>'char',
+								'assessments'=>'char',
+								'usecaptcha'=>'char',
+								'usetokens'=>'char',
+								'showxquestions'=>'char',
+								'showgroupinfo'=>'char',
+								'shownoanswer'=>'char',
+								'showqnumcode'=>'char',
+								'showwelcome'=>'char',
+								'showprogress'=>'char',
+								'allowjumps'=>'char',
+								'nokeyboard'=>'char',
+								'alloweditaftercompletion'=>'char',
+								'googleanalyticsstyle'=>'char',
+								'bounceprocessing'=>'char',
+								'autonumber_start'=>'int',
+								'tokenlength'=>'int',
+								'bouncetime'=>'int',
+								'navigationdelay'=>'int',
+								'expires'=>'date',
+								'startdate'=>'date',
+								'datecreated'=>'date',
+								'adminemail'=>'email',
+								'bounce_email'=>'email',
+								'surveyls_dateformat'=>'dateformat',
+								'surveyls_numberformat'=>'numberformat',
+								'template'=>'tmpl',
+								'format'=>'gsa_format'
+								);
+		
+		if (array_key_exists($sparam_name, $validation_categories))
+		{
+			switch($validation_categories[$sparam_name])
+			{
+			case 'char':
+				if(in_array($sparam_value, array('Y','N')))
+					return $sparam_value;
+				else
+					return false;
+				break;
+			
+			case 'int':
+				return filter_var($sparam_value, FILTER_VALIDATE_INT, array("options" => array("min_range"=>1, "max_range"=>999999999)));
+				break;
+			
+			case 'date':
+				return filter_var($sparam_value, FILTER_VALIDATE_REGEXP,array("options"=>array("regexp"=>$date_pattern)));
+				break;
+
+			case 'email':
+				return filter_var($sparam_value, FILTER_VALIDATE_EMAIL);
+				break;
+							
+			case 'dateformat':
+				return filter_var($sparam_value, FILTER_VALIDATE_INT, array("options" => array("min_range"=>1, "max_range"=>12)));
+				break;
+				
+			case 'numberformat':
+				return filter_var($sparam_value, FILTER_VALIDATE_INT, array("options" => array("min_range"=>0, "max_range"=>1)));
+				break;
+			case 'tmpl':
+				if(array_key_exists($sparam_value,getTemplateList()))
+					return $sparam_value;
+				else
+					return false;
+				break;
+			case 'gsa_format':
+				if(in_array($sparam_value, array('G','S','A')))
+					return $sparam_value;
+				else
+					return false;
+				break;							
+			default:
+				return $sparam_value;
+	
+			}
+
+		}
+		else
+			return $sparam_value;
+	}
+    
 }
