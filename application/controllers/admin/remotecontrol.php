@@ -212,6 +212,85 @@ class remotecontrol_handle
     } 
 
     /**
+     * XML-RPC routine to get survey summary, regarding token usage and survey participation
+     * Return integer with the requested value
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @param string $stats_name
+     * @return string
+     */
+   public function get_survey_summary($session_key,$sid, $stat_name)
+    {
+       $permitted_stats = array();
+       if ($this->_checkSessionKey($session_key))
+       { 	  
+		$permitted_token_stats = array('token_count', 
+								'token_invalid', 
+								'token_sent', 
+								'token_opted_out',
+								'token_completed'
+								);					
+		$permitted_survey_stats  = array('completed_responses',  
+								'incomplete_responses', 
+								'full_responses' 
+								);  
+								
+		if (tableExists('{{tokens_' . $sid . '}}'))
+		{
+			$summary = Tokens_dynamic::model($sid)->summary();
+			$permitted_stats = array_merge($permitted_stats, $permitted_token_stats);
+		}
+		
+		if (tableExists('{{survey_' . $sid . '}}'))
+		{
+			$permitted_stats = array_merge($permitted_stats, $permitted_survey_stats);
+		}		
+											
+		if (!in_array($stat_name, $permitted_stats)) 
+		{
+			throw new Zend_XmlRpc_Server_Exception('Data not available', 23);
+			exit;
+		}	
+
+		switch($stat_name) 
+		{
+			case 'token_count':
+				if (isset($summary))
+					return $summary['tkcount'];
+				break;
+			case 'token_invalid':
+				if (isset($summary))
+					return $summary['tkinvalid'];
+				break;	
+			case 'token_sent':
+				if (isset($summary))
+					return $summary['tksent'];
+				break;
+			case 'token_opted_out':
+				if (isset($summary))
+					return $summary['tkoptout'];
+				break;
+			case 'token_completed';
+				if (isset($summary))
+					return $summary['tkcompleted'];
+				break;
+			case 'completed_responses':
+				return Survey_dynamic::model($sid)->count('submitdate IS NOT NULL');
+				break;
+			case 'incomplete_responses':
+				return Survey_dynamic::model($sid)->countByAttributes(array('submitdate' => null));
+				break;
+			case 'full_responses';
+				return Survey_dynamic::model($sid)->count();
+				break;			
+			default:
+				throw new Zend_XmlRpc_Server_Exception('Data is not available', 23);
+		}
+        }
+    } 
+
+    /**
      * XML-RPC routine to delete a survey
      *
      * @access public
