@@ -361,6 +361,63 @@ class remotecontrol_handle
         }
     } 
 
+   /**
+     * XML-RPC routine to import a survey
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+	 * @param string $sSurveyfile
+     * @return string
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function import_survey_file($session_key, $sid, $sSurveyfile)   
+	{
+		Yii::app()->loadHelper('admin/import');
+		if ($this->_checkSessionKey($session_key))
+        {  
+			$surveyidExists = Survey::model()->findByPk($sid);
+			if (isset($surveyidExists))
+			{
+                throw new Zend_XmlRpc_Server_Exception('Survey already exists', 27);
+				exit;
+			}  
+			//Assuming that surveys should be in the upload/surveys directory
+			$sFullFilepath = Yii::app()->getConfig('uploaddir').'/surveys/'.$sSurveyfile;
+			if ($sSurveyfile!='' && file_exists($sFullFilepath))
+			{	
+				$aPathInfo = pathinfo($sFullFilepath);
+				$sExtension = $aPathInfo['extension'];
+
+				if (isset($sExtension) && strtolower($sExtension)=='csv')
+				{
+					$aImportResults=CSVImportSurvey($sFullFilepath,$sid);
+				}
+				elseif (isset($sExtension) && strtolower($sExtension)=='lss')
+				{
+					$aImportResults=XMLImportSurvey($sFullFilepath,NULL,NULL,$sid);
+				}
+				$iNewSid = $aImportResults['newsid'];
+				if($iNewSid==NULL)
+				{
+					throw new Zend_XmlRpc_Server_Exception('Import failed', 29);
+					exit;
+				}
+				else
+				{
+					Survey::model()->updateByPk($iNewSid, array('datecreated'=> date("Y-m-d")));
+					return $iNewSid;
+				}			
+			}
+			else
+			{
+				throw new Zend_XmlRpc_Server_Exception('Survey file does not exist (in server)', 21);
+				exit;					
+			}
+        }		
+	} 
+
+
     /**
      * XML-RPC routine to activate a survey
      *
