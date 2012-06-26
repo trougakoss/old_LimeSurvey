@@ -523,7 +523,17 @@ function activateSurvey($surveyid, $simulate = false)
     }
 
 
-    return $activateoutput;
+    if(Yii::app()->controller->action->id == 'remotecontrol')
+    {
+        if(isset($lsrcOutput) && $lsrcOutput == true)
+            return true;
+        else
+            return false;
+    }
+    else
+    {
+        return $activateoutput;
+    }
 
 }
 
