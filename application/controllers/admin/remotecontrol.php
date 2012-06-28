@@ -417,6 +417,52 @@ class remotecontrol_handle
         }		
 	} 
 
+   /**
+     * XML-RPC routine to import a survey from xmlstream
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+	 * @param string $sXMLdata
+     * @return string
+     * @throws Zend_XmlRpc_Server_Exception
+     */    
+	public function import_survey_xmldata($session_key, $sid, $sXMLdata)   
+	{
+		Yii::app()->loadHelper('admin/import');
+		if ($this->_checkSessionKey($session_key))
+        {  
+			$surveyidExists = Survey::model()->findByPk($sid);
+			if (isset($surveyidExists))
+			{
+                throw new Zend_XmlRpc_Server_Exception('Survey already exists', 27);
+				exit;
+			}  
+			
+			if ($sXMLdata!='')
+			{	
+				$sXMLdata=htmlspecialchars_decode($sXMLdata);
+				$aImportResults=XMLImportSurvey(NULL,$sXMLdata,NULL,$sid);
+				$iNewSid = $aImportResults['newsid'];
+				if($iNewSid==NULL)
+				{
+					throw new Zend_XmlRpc_Server_Exception('Import failed', 29);
+					exit;
+				}
+				else
+				{
+					Survey::model()->updateByPk($iNewSid, array('datecreated'=> date("Y-m-d")));
+					return $iNewSid;
+				}		
+			}
+			else
+			{
+				throw new Zend_XmlRpc_Server_Exception('Insufficient input', 21);
+				exit;					
+			}
+						
+        }		
+	} 
 
     /**
      * XML-RPC routine to activate a survey
