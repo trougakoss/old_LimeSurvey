@@ -464,6 +464,96 @@ class remotecontrol_handle
         }		
 	} 
 
+
+    /**
+     * XML-RPC routine to create an empty survey with minimum details
+     * Used as a placeholder for importing groups and/or questions
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+	 * @param string $sSurveyTitle
+	 * @param string $sSurveyLanguage	 
+	 * @param string $sformat
+     * @return string
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function create_survey($session_key, $sid, $sSurveyTitle, $sSurveyLanguage, $sformat = 'G')
+	{
+		Yii::app()->loadHelper("surveytranslator");
+		if ($this->_checkSessionKey($session_key))
+        {
+			if (Yii::app()->session['USER_RIGHT_CREATE_SURVEY'])
+			{	
+				if( $sSurveyTitle=='' || $sSurveyLanguage=='' || !array_key_exists($sSurveyLanguage,getLanguageDataRestricted()) || !in_array($sformat, array('A','G','S')))
+				{
+					throw new Zend_XmlRpc_Server_Exception('Faulty parameters', 21);
+					exit;
+				}   
+
+            $aInsertData = array(
+            'template' => 'default',
+            'owner_id' => Yii::app()->session['loginID'],
+            'active' => 'N',
+            'language'=>$sSurveyLanguage,
+            'format' => $sformat
+            );
+
+            if(Yii::app()->getConfig('filterxsshtml') && Yii::app()->session['USER_RIGHT_SUPERADMIN'] != 1)
+                $xssfilter = true;
+            else
+                $xssfilter = false;
+
+
+            if (!is_null($sid))
+            {
+					$aInsertData['wishSID'] = $sid;
+            }
+
+			$iNewSurveyid = Survey::model()->insertNewSurvey($aInsertData, $xssfilter);
+			if (!$iNewSurveyid)
+			{
+				throw new Zend_XmlRpc_Server_Exception('Creation failed', 28);
+				exit;				
+			}
+           
+			$sTitle = html_entity_decode($sSurveyTitle, ENT_QUOTES, "UTF-8");
+
+			// Load default email templates for the chosen language
+			$oLanguage = new Limesurvey_lang($sSurveyLanguage);
+			$aDefaultTexts = templateDefaultTexts($oLanguage, 'unescaped');
+			unset($oLanguage);
+			
+			$bIsHTMLEmail = false;
+			
+            $aInsertData = array('surveyls_survey_id' => $iNewSurveyid,
+            'surveyls_title' => $sTitle,
+            'surveyls_language' => $sSurveyLanguage,          
+            'surveyls_email_invite_subj' => $aDefaultTexts['invitation_subject'],
+            'surveyls_email_invite' => conditionalNewlineToBreak($aDefaultTexts['invitation'], $bIsHTMLEmail, 'unescaped'),
+            'surveyls_email_remind_subj' => $aDefaultTexts['reminder_subject'],
+            'surveyls_email_remind' => conditionalNewlineToBreak($aDefaultTexts['reminder'], $bIsHTMLEmail, 'unescaped'),
+            'surveyls_email_confirm_subj' => $aDefaultTexts['confirmation_subject'],
+            'surveyls_email_confirm' => conditionalNewlineToBreak($aDefaultTexts['confirmation'], $bIsHTMLEmail, 'unescaped'),
+            'surveyls_email_register_subj' => $aDefaultTexts['registration_subject'],
+            'surveyls_email_register' => conditionalNewlineToBreak($aDefaultTexts['registration'], $bIsHTMLEmail, 'unescaped'),
+            'email_admin_notification_subj' => $aDefaultTexts['admin_notification_subject'],
+            'email_admin_notification' => conditionalNewlineToBreak($aDefaultTexts['admin_notification'], $bIsHTMLEmail, 'unescaped'),
+            'email_admin_responses_subj' => $aDefaultTexts['admin_detailed_notification_subject'],
+            'email_admin_responses' => $aDefaultTexts['admin_detailed_notification']
+            );
+            
+            $langsettings = new Surveys_languagesettings;
+            $langsettings->insertNewSurvey($aInsertData, $xssfilter);
+            Survey_permissions::model()->giveAllSurveyPermissions(Yii::app()->session['loginID'], $iNewSurveyid);
+
+			return 	$iNewSurveyid;				
+			}				
+		}			
+	}
+  
+   
+
     /**
      * XML-RPC routine to activate a survey
      *
