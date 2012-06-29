@@ -562,7 +562,72 @@ class remotecontrol_handle
 		}			
 	}
   
-   
+    /**
+     * XML-RPC routine to import a group into a survey
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+	 * @param string $sGroupfile
+	 * @param string $sName	 
+	 * @param string $sDesc
+     * @return string
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function import_group($session_key, $sid, $sGroupfile, $sName='', $sDesc='')
+	{
+		libxml_use_internal_errors(true);
+		Yii::app()->loadHelper('admin/import');
+		if ($this->_checkSessionKey($session_key))
+        { 
+			$surveyidExists = Survey::model()->findByPk($sid);
+			if (!isset($surveyidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid Survey id', 22);
+						 
+			$sFullFilepath = Yii::app()->getConfig('uploaddir').'/surveys/'.$sGroupfile;
+			if(!file_exists($sFullFilepath) || $sGroupfile=='' )
+					throw new Zend_XmlRpc_Server_Exception('File does not exist', 21);
+		
+			if (hasSurveyPermission($sid, 'survey', 'update'))
+            {
+				$aPathInfo = pathinfo($sFullFilepath);
+				$sExtension = $aPathInfo['extension'];
+
+				if (isset($sExtension) && strtolower($sExtension)=='csv')
+				{
+					$checkImport = CSVImportGroup($sFullFilepath, $sid);
+				}
+				elseif (isset($sExtension) && strtolower($sExtension)=='lsg')
+				{
+					$xml = simplexml_load_file($sFullFilepath);
+					if(!$xml)
+						throw new Zend_XmlRpc_Server_Exception('This is not a valid LimeSurvey group structure XML file', 21);
+				
+					$checkImport = XMLImportGroup($sFullFilepath, $sid);
+				}
+				else
+					throw new Zend_XmlRpc_Server_Exception('Invalid input file', 21);
+					
+				if(array_key_exists('fatalerror',$checkImport))
+					throw new Zend_XmlRpc_Server_Exception($checkImport['fatalerror'], 29);					
+				
+					
+				$iNewSid = $checkImport['newgid'];	
+				
+				$group = Groups::model()->findByAttributes(array('gid' => $iNewSid));
+				$slang=$group['language'];
+				if($sName!='')
+				$group->setAttribute('group_name',$sName);
+				if($sDesc!='')
+				$group->setAttribute('description',$sDesc);
+				$group->save();
+				
+				return "Import OK ".$iNewSid;
+			}
+			else
+				throw new Zend_XmlRpc_Server_Exception('No permission', 2);	
+        }		
+	}      
 
     /**
      * XML-RPC routine to activate a survey
