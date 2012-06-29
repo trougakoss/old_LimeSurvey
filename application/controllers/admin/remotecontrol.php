@@ -449,14 +449,18 @@ class remotecontrol_handle
 			{	
 				$sXMLdata=htmlspecialchars_decode($sXMLdata);
 				$aImportResults=XMLImportSurvey(NULL,$sXMLdata,NULL,$sid);
-				$iNewSid = $aImportResults['newsid'];
-				if($iNewSid==NULL)
+				
+				if(array_key_exists('error',$aImportResults))
+					throw new Zend_XmlRpc_Server_Exception($aImportResults['error'], 29);					
+				
+				if($aImportResults['newsid']==NULL )
 				{
 					throw new Zend_XmlRpc_Server_Exception('Import failed', 29);
 					exit;
 				}
 				else
 				{
+					$iNewSid = $aImportResults['newsid'];
 					Survey::model()->updateByPk($iNewSid, array('datecreated'=> date("Y-m-d")));
 					return $iNewSid;
 				}		
