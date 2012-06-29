@@ -3327,7 +3327,7 @@ function XMLImportSurvey($sFullFilepath,$sXMLdata=NULL,$sNewSurveyName=NULL,$iDe
 {
     Yii::app()->loadHelper('database');
     $clang = Yii::app()->lang;
-
+	libxml_use_internal_errors(true);
     if(Yii::app()->getConfig('filterxsshtml') && Yii::app()->session['USER_RIGHT_SUPERADMIN'] != 1)
         $xssfilter = true;
     else
@@ -3342,7 +3342,7 @@ function XMLImportSurvey($sFullFilepath,$sXMLdata=NULL,$sNewSurveyName=NULL,$iDe
         $xml = simplexml_load_string($sXMLdata);
     }
 
-    if ($xml->LimeSurveyDocType!='Survey')
+    if (!$xml || $xml->LimeSurveyDocType!='Survey')
     {
         $results['error'] = $clang->gT("This is not a valid LimeSurvey survey structure XML file.");
         return $results;
