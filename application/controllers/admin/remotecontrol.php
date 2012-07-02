@@ -611,10 +611,17 @@ class remotecontrol_handle
 				if(array_key_exists('fatalerror',$checkImport))
 					throw new Zend_XmlRpc_Server_Exception($checkImport['fatalerror'], 29);					
 				
-					
-				$iNewSid = $checkImport['newgid'];	
+				if($checkImport['newgid']==NULL )
+				{
+					throw new Zend_XmlRpc_Server_Exception('Import failed', 29);
+					exit;
+				}
+				else
+				{				
+									
+				$iNewgid = $checkImport['newgid'];	
 				
-				$group = Groups::model()->findByAttributes(array('gid' => $iNewSid));
+				$group = Groups::model()->findByAttributes(array('gid' => $iNewgid));
 				$slang=$group['language'];
 				if($sName!='')
 				$group->setAttribute('group_name',$sName);
@@ -622,7 +629,8 @@ class remotecontrol_handle
 				$group->setAttribute('description',$sDesc);
 				$group->save();
 				
-				return "Import OK ".$iNewSid;
+				return "Import OK ".$iNewgid;
+				}			
 			}
 			else
 				throw new Zend_XmlRpc_Server_Exception('No permission', 2);	
