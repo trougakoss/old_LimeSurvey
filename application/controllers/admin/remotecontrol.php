@@ -400,7 +400,7 @@ class remotecontrol_handle
 				else
 					throw new Zend_XmlRpc_Server_Exception('Invalid input', 21);
 							
-				if($aImportResults['error']!=NULL)
+				if(array_key_exists('error',$aImportResults))
 					throw new Zend_XmlRpc_Server_Exception($aImportResults['error'], 29);
 
 				if($aImportResults['newsid']==NULL )
