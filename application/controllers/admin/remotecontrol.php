@@ -583,6 +583,9 @@ class remotecontrol_handle
 			$surveyidExists = Survey::model()->findByPk($sid);
 			if (!isset($surveyidExists))
 				throw new Zend_XmlRpc_Server_Exception('Invalid Survey id', 22);
+							
+			if($surveyidExists->getAttribute('active') =='Y')
+				throw new Zend_XmlRpc_Server_Exception('Survey is active and not editable', 35);				
 						 
 			$sFullFilepath = Yii::app()->getConfig('uploaddir').'/surveys/'.$sGroupfile;
 			if(!file_exists($sFullFilepath) || $sGroupfile=='' )
