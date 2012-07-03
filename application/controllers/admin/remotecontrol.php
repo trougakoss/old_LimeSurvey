@@ -1073,18 +1073,18 @@ class remotecontrol_handle
 								'sendconfirmation'=>'char',
 								'tokenanswerspersistence'=>'char',
 								'assessments'=>'char',
-								'usecaptcha'=>'char',
+								'usecaptcha'=>'captcha_format',
 								'usetokens'=>'char',
 								'showxquestions'=>'char',
-								'showgroupinfo'=>'char',
+								'showgroupinfo'=>'group_format',
 								'shownoanswer'=>'char',
-								'showqnumcode'=>'char',
+								'showqnumcode'=>'gnum_format',
 								'showwelcome'=>'char',
 								'showprogress'=>'char',
 								'allowjumps'=>'char',
 								'nokeyboard'=>'char',
 								'alloweditaftercompletion'=>'char',
-								'googleanalyticsstyle'=>'char',
+								'googleanalyticsstyle'=>'ga_format',
 								'bounceprocessing'=>'char',
 								'autonumber_start'=>'int',
 								'tokenlength'=>'int',
@@ -1142,7 +1142,28 @@ class remotecontrol_handle
 					return $sparam_value;
 				else
 					return false;
-				break;							
+				break;	
+			case 'captcha_format':
+				if(in_array($sparam_value, array('A','B','C','D','X','R','S','N')))
+					return $sparam_value;
+				else
+					return false;
+				break;
+			case 'group_format':
+				if(in_array($sparam_value, array('B','N','D','X')))
+					return $sparam_value;
+				else
+					return false;
+				break;	
+			case 'gnum_format':
+				if(in_array($sparam_value, array('B','N','C','X')))
+					return $sparam_value;
+				else
+					return false;
+				break;	
+			case 'ga_format':
+				return filter_var($sparam_value, FILTER_VALIDATE_INT, array("options" => array("min_range"=>0, "max_range"=>2)));
+				break;																
 			default:
 				return $sparam_value;
 	
