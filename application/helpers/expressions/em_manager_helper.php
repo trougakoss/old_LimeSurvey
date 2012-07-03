@@ -3106,7 +3106,7 @@
                 switch($type)
                 {
                     case 'R': //RANKING STYLE
-                        $jsVarName_on = 'fvalue_' . $fieldNameParts[2];
+                        $jsVarName_on = 'answer' . $sgqa;
                         $jsVarName = 'java' . $sgqa;
                         break;
                     case 'D': //DATE
@@ -3781,6 +3781,120 @@
         {
             $LEM =& LimeExpressionManager::singleton();
             return $LEM->em->GetLastPrettyPrintExpression();
+        }
+
+        /**
+         * Expand "self.suffix" and "that.qcode.suffix" into canonical list of variable names
+         * @param type $qseq
+         * @param type $varname
+         */
+        static function GetAllVarNamesForQ($qseq,$varname)
+        {
+            $LEM =& LimeExpressionManager::singleton();
+
+            $parts = explode('.',$varname);
+            $qroot = '';
+            $suffix = '';
+            $sqpatt = '';
+            $comments = '';
+
+            if ($parts[0] == 'self')
+            {
+                $type = 'self';
+            }
+            else
+            {
+                $type = 'that';
+                array_shift($parts);
+                if (isset($parts[0]))
+                {
+                    $qroot = $parts[0];
+                }
+                else
+                {
+                    return $varname;
+                }
+            }
+
+            if (count($parts) > 3)
+            {
+                return $varname;    // invalid
+            }
+            if (count($parts) == 3)
+            {
+                if (preg_match('/^' . ExpressionManager::$RDP_regex_var_attr . '$/',$parts[2]))
+                {
+                    $suffix = '.' . $parts[2];
+                }
+                else
+                {
+                    return $varname;    // invalid
+                }
+            }
+            if (count($parts) >= 2)
+            {
+                if (count($parts) == 2 && preg_match('/^' . ExpressionManager::$RDP_regex_var_attr . '$/',$parts[1]))
+                {
+                    $suffix = '.' . $parts[1];
+                }
+                else if (preg_match('/^sq_.+$/',$parts[1]))
+                {
+                    $sqpatt = substr($parts[1],3);
+                }
+                else if ($parts[1] == 'nocomments')
+                {
+                    $comments = 'N';
+                }
+                else if ($parts[1] == 'comments')
+                {
+                    $comments = 'Y';
+                }
+                else
+                {
+                    return $varname;    // invalid
+                }
+            }
+            $vars = array();
+
+            foreach ($LEM->knownVars as $kv)
+            {
+                if ($type == 'self')
+                {
+                    if (!isset($kv['qseq']) || $kv['qseq'] != $qseq || trim($kv['sgqa']) == '')
+                    {
+                        continue;
+                    }
+                }
+                else
+                {
+                    if (!isset($kv['rootVarName']) || $kv['rootVarName'] != $qroot)
+                    {
+                        continue;
+                    }
+                }
+                if ($comments != '')
+                {
+                    if ($comments == 'Y' && !preg_match('/comment$/',$kv['sgqa']))
+                    {
+                        continue;
+                    }
+                    if ($comments == 'N' && preg_match('/comment$/',$kv['sgqa']))
+                    {
+                        continue;
+                    }
+                }
+                if ($sqpatt != '')
+                {
+                    $sgq = $LEM->sid . 'X' . $kv['gid'] . 'X' . $kv['qid'];
+                    $ext = substr($kv['sgqa'],strlen($sgq));
+                    if (!preg_match('/'.$sqpatt.'/',$ext))
+                    {
+                        continue;
+                    }
+                }
+                $vars[] = $kv['sgqa'] . $suffix;
+            }
+            return implode(',',$vars);
         }
 
         /**
@@ -6173,7 +6287,7 @@
                         if ($_veq['subqValidSelector'] == '') {
                             continue;
                         }
-                        $isValid = $LEM->em->ProcessBooleanExpression($_veq['subqValidEqn']);
+                        $isValid = $LEM->em->ProcessBooleanExpression($_veq['subqValidEqn'],$arg['gseq'],$LEM->questionId2questionSeq[$arg['qid']]);
                         $_sqValidVars = $LEM->em->GetJSVarsUsed();
                         $allJsVarsUsed = array_merge($allJsVarsUsed,$_sqValidVars);
                         $valJsVarsUsed = array_merge($valJsVarsUsed,$_sqValidVars);
@@ -6212,7 +6326,7 @@
                                     $_hasOtherValidation = true;
                             }
 
-                            $_isValid = $LEM->em->ProcessBooleanExpression($validationEqn);
+                            $_isValid = $LEM->em->ProcessBooleanExpression($validationEqn,$arg['gseq'],$LEM->questionId2questionSeq[$arg['qid']]);
                             $_vars = $LEM->em->GetJSVarsUsed();
                             $allJsVarsUsed = array_merge($allJsVarsUsed,$_vars);
                             $valJsVarsUsed = array_merge($valJsVarsUsed,$_vars);
