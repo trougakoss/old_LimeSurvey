@@ -135,20 +135,18 @@ class Tokens_dynamic extends LSActiveRecord
     {
         return Yii::app()->db->createCommand("SELECT tid FROM {{tokens_{$iSurveyID}}} WHERE token IS NULL OR token=''")->queryAll();
     }
-
     /**
      * Creates tokens for all token records that have empty token fields and returns the number
      * of tokens created
      *
      * @param int $iSurveyID
-     * @return int number of created tokens
+     * @return array ( int number of created tokens, int number to be created tokens)
      */
     function createTokens($iSurveyID)
     {
         $tkresult = $this->selectEmptyTokens($iSurveyID);
-
         //Exit early if there are not empty tokens
-        if (count($tkresult)===0) return 0;
+        if (count($tkresult)===0) return array(0,0);
 
         //get token length from survey settings
         $tlrow = Survey::model()->findByAttributes(array("sid"=>$iSurveyID));
@@ -159,35 +157,48 @@ class Tokens_dynamic extends LSActiveRecord
         {
             $iTokenLength = 15;
         }
-
         //Add some criteria to select only the token field
         $criteria = $this->getDbCriteria();
         $criteria->select = 'token';
-		$ntresult = $this->findAllAsArray($criteria);   //Use AsArray to skip active record creation
+        $ntresult = $this->findAllAsArray($criteria);   //Use AsArray to skip active record creation
 
         // select all existing tokens
         foreach ($ntresult as $tkrow)
         {
-            $existingtokens[] = $tkrow['token'];
+            $existingtokens[$tkrow['token']] = true;
         }
 
         $newtokencount = 0;
+        $invalidtokencount=0;
         foreach ($tkresult as $tkrow)
         {
             $bIsValidToken = false;
-            while ($bIsValidToken == false)
+            while ($bIsValidToken == false && $invalidtokencount<50)
             {
                 $newtoken = randomChars($iTokenLength);
-                if (!in_array($newtoken, $existingtokens)) {
-                    $existingtokens[] = $newtoken;
+                if (!isset($existingtokens[$newtoken])) 
+                {
+                    $existingtokens[$newtoken] = true;
                     $bIsValidToken = true;
+                    $invalidtokencount=0;
+                }
+                else
+                {
+                    $invalidtokencount ++;
                 }
             }
-            $itresult = $this->updateToken($tkrow['tid'], $newtoken);
-            $newtokencount++;
+            if($bIsValidToken)
+            {
+                $itresult = $this->updateToken($tkrow['tid'], $newtoken);
+                $newtokencount++;
+            }
+            else
+            {
+                break;
+            }
         }
 
-        return $newtokencount;
+        return array($newtokencount,count($tkresult));
     }
 
     public function search()

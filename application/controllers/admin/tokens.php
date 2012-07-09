@@ -247,16 +247,20 @@ class tokens extends Survey_Common_Action
         {
             self::_newtokentable($iSurveyId);
         }
+        // Javascript
         $this->getController()->_js_admin_includes(Yii::app()->getConfig('generalscripts') . "admin/tokens.js");
         $this->getController()->_js_admin_includes(Yii::app()->getConfig('generalscripts') . "admin/tokentocpdb.js");
         $this->getController()->_js_admin_includes(Yii::app()->getConfig('generalscripts') . "jquery/jquery.multiselect.min.js");
         $this->getController()->_js_admin_includes(Yii::app()->getConfig('generalscripts') . "jquery/jqGrid/js/i18n/grid.locale-en.js");
         $this->getController()->_js_admin_includes(Yii::app()->getConfig('generalscripts') . "jquery/jqGrid/js/jquery.jqGrid.min.js");
-        $this->getController()->_css_admin_includes(Yii::app()->getConfig('generalscripts') . "jquery/css/jquery.multiselect.css");
-        $this->getController()->_css_admin_includes(Yii::app()->getConfig('generalscripts') . "jquery/css/jquery.multiselect.filter.css");
+        $this->getController()->_js_admin_includes(Yii::app()->getConfig('generalscripts') . "jquery/jquery-ui-timepicker-addon.js");
+        // CSS
+//        $this->getController()->_css_admin_includes(Yii::app()->getConfig('generalscripts') . "jquery/css/jquery.multiselect.css");
+//        $this->getController()->_css_admin_includes(Yii::app()->getConfig('generalscripts') . "jquery/css/jquery.multiselect.filter.css");
         $this->getController()->_css_admin_includes(Yii::app()->getConfig('generalscripts') . "jquery/jqGrid/css/ui.jqgrid.css");
         $this->getController()->_css_admin_includes(Yii::app()->getConfig('generalscripts') . "jquery/jqGrid/css/jquery.ui.datepicker.css");
         $this->getController()->_css_admin_includes(Yii::app()->getConfig('adminstyleurl') . "displayParticipants.css");
+        $this->getController()->_css_admin_includes(Yii::app()->getConfig('adminstyleurl') . "jquery-ui/jquery-timepicker.css");
 
         Yii::app()->loadHelper('surveytranslator');
         Yii::import('application.libraries.Date_Time_Converter', true);
@@ -822,33 +826,70 @@ class tokens extends Survey_Common_Action
             $amount = sanitize_int(Yii::app()->request->getPost('amount'));
             $tokenlength = sanitize_int(Yii::app()->request->getPost('tokenlen'));
 
-            for ($i = 0; $i < $amount; $i++)
+            // Fill an array with all existing tokens
+            $criteria = Tokens_dynamic::model($iSurveyId)->getDbCriteria();
+            $criteria->select = 'token';
+            $ntresult = Tokens_dynamic::model($iSurveyId)->findAllAsArray($criteria);   //Use AsArray to skip active record creation
+            $existingtokens=array();
+            foreach ($ntresult as $tkrow)
+            {
+                $existingtokens[$tkrow['token']] = true ;
+            }
+            $invalidtokencount=0;
+            $newDummyToken=0;
+            while ($newDummyToken<$amount && $invalidtokencount<50)
             {
                 $aDataToInsert = $aData;
-                $aDataToInsert['firstname'] = str_replace('{TOKEN_COUNTER}', $i, $aDataToInsert['firstname']);
-                $aDataToInsert['lastname'] = str_replace('{TOKEN_COUNTER}', $i, $aDataToInsert['lastname']);
-                $aDataToInsert['email'] = str_replace('{TOKEN_COUNTER}', $i, $aDataToInsert['email']);
+                $aDataToInsert['firstname'] = str_replace('{TOKEN_COUNTER}', $newDummyToken, $aDataToInsert['firstname']);
+                $aDataToInsert['lastname'] = str_replace('{TOKEN_COUNTER}', $newDummyToken, $aDataToInsert['lastname']);
+                $aDataToInsert['email'] = str_replace('{TOKEN_COUNTER}', $newDummyToken, $aDataToInsert['email']);
 
                 $isvalidtoken = false;
-                while ($isvalidtoken == false)
+                while ($isvalidtoken == false && $invalidtokencount<50)
                 {
                     $newtoken = randomChars($tokenlength);
                     if (!isset($existingtokens[$newtoken]))
                     {
                         $isvalidtoken = true;
-                        $existingtokens[$newtoken] = null;
+                        $existingtokens[$newtoken] = true;
+                        $invalidtokencount=0;
+                    }
+                    else
+                    {
+                        $invalidtokencount ++;
                     }
                 }
+                if($isvalidtoken)
+                {
+                    $aDataToInsert['token'] = $newtoken;
+                    Tokens_dynamic::insertToken($iSurveyId, $aDataToInsert);
+                    $newDummyToken ++;
+                }
 
-                $aDataToInsert['token'] = $newtoken;
-                Tokens_dynamic::insertToken($iSurveyId, $aDataToInsert);
             }
+            $aData['thissurvey'] = getSurveyInfo($iSurveyId);
+            $aData['surveyid'] = $iSurveyId;
+            if(!$invalidtokencount)
+            {
+                $aData['success'] = false;
+                $message=array('title' => $clang->gT("Success"),
+                'message' => $clang->gT("New dummy tokens were added.") . "<br /><br />\n<input type='button' value='"
+                . $clang->gT("Display tokens") . "' onclick=\"window.open('" . $this->getController()->createUrl("admin/tokens/browse/surveyid/$iSurveyId") . "', '_top')\" />\n"
+                );
+            }
+            else
+            {
+                $aData['success'] = true;
+                $message= array(
+                'title' => $clang->gT("Failed"),
+                'message' => "<p>".sprintf($clang->gT("Only %s new dummy tokens were added after %s trials."),$newDummyToken,$invalidtokencount)
+                .$clang->gT("Try with a bigger token length.")."</p>"
+                ."\n<input type='button' value='"
+                . $clang->gT("Display tokens") . "' onclick=\"window.open('" . $this->getController()->createUrl("admin/tokens/browse/surveyid/$iSurveyId") . "', '_top')\" />\n"
+                );
+            }
+            $this->_renderWrappedTemplate('token',  array('tokenbar','message' => $message),$aData);
 
-            $this->_renderWrappedTemplate('token', array('message' => array(
-            'title' => $clang->gT("Success"),
-            'message' => $clang->gT("New dummy tokens were added.") . "<br /><br />\n<input type='button' value='"
-            . $clang->gT("Display tokens") . "' onclick=\"window.open('" . $this->getController()->createUrl("admin/tokens/browse/surveyid/$iSurveyId") . "', '_top')\" />\n"
-            ) ));
         }
         else
         {
@@ -1154,9 +1195,9 @@ class tokens extends Survey_Common_Action
 
                     $from = Yii::app()->request->getPost('from_' . $emrow['language']);
 
-                    $fieldsarray["{OPTOUTURL}"] = $this->getController()->createUrl("/optout/langcode/" . trim($emrow['language']) . "/surveyid/{$iSurveyId}/token/{$emrow['token']}");
-                    $fieldsarray["{OPTINURL}"] = $this->getController()->createUrl("/optin/langcode/" . trim($emrow['language']) . "/surveyid/{$iSurveyId}/token/{$emrow['token']}");
-                    $fieldsarray["{SURVEYURL}"] = $this->getController()->createUrl("/survey/langcode/" . trim($emrow['language']) . "/surveyid/{$iSurveyId}/token/{$emrow['token']}");
+                    $fieldsarray["{OPTOUTURL}"] = $this->getController()->createAbsoluteUrl("/optout/langcode/" . trim($emrow['language']) . "/surveyid/{$iSurveyId}/token/{$emrow['token']}");
+                    $fieldsarray["{OPTINURL}"] = $this->getController()->createAbsoluteUrl("/optin/langcode/" . trim($emrow['language']) . "/surveyid/{$iSurveyId}/token/{$emrow['token']}");
+                    $fieldsarray["{SURVEYURL}"] = $this->getController()->createAbsoluteUrl("/survey/langcode/" . trim($emrow['language']) . "/surveyid/{$iSurveyId}/token/{$emrow['token']}");
 
                     foreach(array('OPTOUT', 'OPTIN', 'SURVEY') as $key)
                     {
@@ -1896,10 +1937,23 @@ class tokens extends Survey_Common_Action
         else
         {
             //get token length from survey settings
-            $newtokencount = Tokens_dynamic::model($iSurveyId)->createTokens($iSurveyId);
+            $newtoken = Tokens_dynamic::model($iSurveyId)->createTokens($iSurveyId);
+            $newtokencount = $newtoken['0'];
+            $neededtokencount = $newtoken['1'];
+            if($neededtokencount>$newtokencount)
+            {
+                $aData['success'] = false;
+                $message = sprintf($clang->ngT('Only %s token has been created.','Only %s tokens have been created.',$newtokencount),$newtokencount)
+                         .sprintf($clang->ngT('Need %s token.','Need %s tokens.',$neededtokencount),$neededtokencount);
+            }
+            else
+            {
+                $aData['success'] = true;
+                $message = sprintf($clang->ngT('%s token has been created.','%s tokens have been created.',$newtokencount),$newtokencount);
+            }
             $this->_renderWrappedTemplate('token', array('tokenbar', 'message' => array(
             'title' => $clang->gT("Create tokens"),
-            'message' => sprintf($clang->ngT('%s token has been created.','%s tokens have been created.',$newtokencount),$newtokencount)
+            'message' => $message
             )), $aData);
         }
     }
@@ -1956,7 +2010,7 @@ class tokens extends Survey_Common_Action
             'message' => '<br />' . $clang->gT("The tokens table has now been removed and tokens are no longer required to access this survey.") . "<br /> " . $clang->gT("A backup of this table has been made and can be accessed by your system administrator.") . "<br />\n"
             . "(\"old_tokens_{$iSurveyId}_$date\")" . "<br /><br />\n"
             . "<input type='submit' value='"
-            . $clang->gT("Main Admin Screen") . "' onclick=\"window.open('" . Yii::app()->getController()->createUrl("admin/") . "', '_top')\" />"
+            . $clang->gT("Main Admin Screen") . "' onclick=\"window.open('" . Yii::app()->getController()->createUrl("admin/survey/view/surveyid/".$iSurveyId) . "', '_top')\" />"
             )), $aData);
 
             LimeExpressionManager::SetDirtyFlag();  // so that knows that token tables have changed
