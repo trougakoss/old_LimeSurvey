@@ -943,6 +943,10 @@ class remotecontrol_handle
 
                     if ($token->insert($participant))
                     {
+						foreach ($participant as $k => $v)
+							$token->$k = $v;
+						$inresult = $token->save();
+						
                         $new_token_id = $token->primaryKey;
 
                         if ($create_token)
