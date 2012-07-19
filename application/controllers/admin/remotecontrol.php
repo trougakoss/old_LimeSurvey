@@ -916,6 +916,93 @@ class remotecontrol_handle
                 throw new Zend_XmlRpc_Server_Exception('No permission', 2);		
 		}	
 	}
+   /**
+     * XML-RPC routine to email statistics of a survey to a user
+     * Returns string - Message sent status
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @param string $email
+     * @param string $docType
+     * @param string $graph
+     * @return string
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+    public function send_statistics($session_key, $sid, $email, $docType='pdf', $graph='0')
+    {
+		Yii::app()->loadHelper('admin/statistics');
+		
+       if ($this->_checkSessionKey($session_key))
+        {
+			if(!is_int($sid) || $sid==0 || $email=='')
+				throw new Zend_XmlRpc_Server_Exception('Insufficient input', 21);
+
+			$surveyidExists = Survey::model()->findByPk($sid);
+			if (!isset($surveyidExists))
+                throw new Zend_XmlRpc_Server_Exception('Invalid Surveyid', 22);
+
+			if(Survey::model()->findByPk($sid)->owner_id != $_SESSION['loginID'])
+				throw new Zend_XmlRpc_Server_Exception('You have no right to send statistics from other peoples Surveys', 30);
+
+
+			$allqs = Questions::model()->findAll("sid = '".$sid."'");
+			foreach($allqs as $field)
+			{
+					$myField = $sid."X".$field['gid']."X".$field['qid'];					 
+					// Multiple choice get special treatment
+					if ($field['type'] == "M" || $field['type'] == "P") {$myField = "M$myField";}
+					//numerical input will get special treatment (arihtmetic mean, standard derivation, ...)
+					if ($field['type'] == "N") {$myField = "N$myField";}					 
+					if ($field['type'] == "Q") {$myField = "Q$myField";}
+					// textfields get special treatment
+					if ($field['type'] == "S" || $field['type'] == "T" || $field['type'] == "U"){$myField = "T$myField";}
+					//statistics for Date questions are not implemented yet.
+					if ($field['type'] == "D") {$myField = "D$myField";}
+					if ($field['type'] == "F" || $field['type'] == "H")
+					{
+						$result3 = Answers::model()->findAllByAttributes(array('qid' => $field['qid'],'language' => getBaseLanguageFromSurveyID($sid)), array('order' => 'sortorder, answer'));
+						foreach ($result3 as $row)
+						{
+							$myField = "$myField{$row['code']}";
+						}
+					}
+					$summary[]=$myField;
+			}
+
+			switch ($docType)
+			{
+				case 'pdf':
+					$tempFile = generate_statistics($sid,$summary,'all',$graph,$docType,'F');
+					break;
+				case 'xls':
+					$tempFile = generate_statistics($sid,$summary,'all',0,$docType, 'F');
+					break;
+				case 'html':
+					$html = generate_statistics($sid,$summary,'all',0,$docType, 'F');
+					break;
+			}
+
+			//$message = sprintf($clang->gT("This is your personal statistic sheet for survey #%s"),$sid);   
+			//$subject = sprintf($clang->gT("Statistics Survey #%s"),$sid);
+
+			$message = sprintf("This is your personal statistic sheet for survey #%s",$sid);   
+			$subject = sprintf("Statistics Survey #%s",$sid);
+			$out =  SendEmailMessage($message,$subject, $email , getBounceEmail($sid), 'thelime',null,getBounceEmail($sid),$tempFile,null);
+
+            if($out)
+            {
+                unlink($tempFile);
+                return 'stats send';
+            }
+            else
+            {
+                unlink($tempFile);
+                throw new Zend_XmlRpc_Server_Exception('Mail System", "Mail could not be send! Check LimeSurveys E-Mail Settings.', 36);
+                exit;
+            }
+        }			
+	}
 
     /**
      * XML-RPC routing to add a response to the survey table
