@@ -567,6 +567,50 @@ class remotecontrol_handle
 			}				
 		}			
 	}
+ 
+    /**
+     * XML-RPC routine to create an empty group with minimum details
+     * Used as a placeholder for importing questions
+     * Returns the groupid of the created group
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+	 * @param string $sGroupTitle
+	 * @param string $sGroupDescription	 
+     * @return string
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+  	public function create_group($session_key, $sid, $sGroupTitle, $sGroupDescription='')
+	{   
+		if ($this->_checkSessionKey($session_key))
+        {
+			if (hasSurveyPermission($sid, 'survey', 'update'))
+            {		
+				$surveyidExists = Survey::model()->findByPk($sid);		   
+				if (!isset($surveyidExists))
+					throw new Zend_XmlRpc_Server_Exception('Invalid Survey id', 22);
+					
+				if($surveyidExists['active']=='Y')
+					throw new Zend_XmlRpc_Server_Exception('Survey is active and not editable', 35);
+
+				$group = new Groups;
+				$group->sid = $sid;
+				$group->group_name =  $sGroupTitle;
+                $group->description = $sGroupDescription;
+                $group->group_order = getMaxGroupOrder($sid);
+                $group->language =  Survey::model()->findByPk($sid)->language;
+				if($group->save())
+					return $group->gid;
+				else
+					throw new Zend_XmlRpc_Server_Exception('Creation failed', 29);
+
+			}
+			else
+				throw new Zend_XmlRpc_Server_Exception('No permission', 2);	
+			
+		}
+	} 
   
     /**
      * XML-RPC routine to import a group into a survey
