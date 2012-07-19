@@ -823,6 +823,47 @@ class remotecontrol_handle
         }
     }
 
+  /**
+     * XML-RPC routine to return the ids and info of surveys belonging to a user
+     * Returns array of ids and info
+     * If user id admin he can get surveys of every user 
+     * else only the syrveys belonging to the user requesting will be shown
+     *
+     * @access public
+     * @param string $session_key
+     * @param string $suser
+     * @return array
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function get_survey_list($session_key, $suser='')
+	{
+       if ($this->_checkSessionKey($session_key))
+       {
+		   $current_user =  Yii::app()->session['user'];
+		   if( Yii::app()->session['USER_RIGHT_SUPERADMIN'] == 1 and $suser !='')
+				$current_user = $suser;
+
+		   $aUserData = User::model()->findByAttributes(array('users_name' => $current_user));		   
+		   if (!isset($aUserData))
+				throw new Zend_XmlRpc_Server_Exception('Invalid user', 38);		   
+	  	  		   
+		   $user_surveys = Survey::model()->findAllByAttributes(array("owner_id"=>$aUserData->attributes['uid'])); 		   
+		   if(count($user_surveys)==0)
+				throw new Zend_XmlRpc_Server_Exception('No Surveys found', 30);
+			
+			foreach ($user_surveys as $asurvey)
+				{
+				$asurvey_ls = Surveys_languagesettings::model()->findByAttributes(array('surveyls_survey_id' => $asurvey->primaryKey, 'surveyls_language' => $asurvey->language));
+				if (!isset($asurvey_ls))
+					$asurvey_title = '';
+				else
+					$asurvey_title = $asurvey_ls->attributes['surveyls_title'];
+				$aData[]= array('sid'=>$asurvey->primaryKey,'surveyls_title'=>$asurvey_title,'startdate'=>$asurvey->attributes['startdate'],'expires'=>$asurvey->attributes['expires'],'active'=>$asurvey->attributes['active']);
+				}
+			return $aData;
+        }				
+	}
+
     /**
      * XML-RPC routing to add a response to the survey table
      * Returns the id of the inserted survey response
