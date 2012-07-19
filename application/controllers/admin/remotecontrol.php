@@ -743,7 +743,73 @@ class remotecontrol_handle
         }		
 	}      
 
+    /**
+     * XML-RPC routine to import a group into a survey
+     * Uses an xml stream instead of a file located in the server
+     * 
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+	 * @param string $sGroupfile
+	 * @param string $sName	 
+	 * @param string $sDesc
+     * @return string
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function import_group_xml($session_key, $sid, $sGroupxml, $sName='', $sDesc='')
+	{
+		libxml_use_internal_errors(true);
+		$sGroupxml=htmlspecialchars_decode($sGroupxml);
+		$xml = simplexml_load_string($sGroupxml);
+		if(!$xml)
+			throw new Zend_XmlRpc_Server_Exception('This is not a valid LimeSurvey group structure XML stream', 21);
+		
 
+		Yii::app()->loadHelper('admin/import');
+		if ($this->_checkSessionKey($session_key))
+        { 
+
+			$surveyidExists = Survey::model()->findByPk($sid);
+			if (!isset($surveyidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid Survey id', 22);
+							
+			if($surveyidExists->getAttribute('active') =='Y')
+				throw new Zend_XmlRpc_Server_Exception('Survey is active and not editable', 35);				
+						 
+			if (hasSurveyPermission($sid, 'survey', 'update'))
+            {
+					
+				$checkImport = XMLImportGroup(null, $sid,$sGroupxml);
+					
+				if(array_key_exists('fatalerror',$checkImport))
+					throw new Zend_XmlRpc_Server_Exception($checkImport['fatalerror'], 29);					
+				
+				if($checkImport['newgid']==NULL )
+				{
+					throw new Zend_XmlRpc_Server_Exception('Import failed', 29);
+					exit;
+				}
+				else
+				{				
+									
+				$iNewgid = $checkImport['newgid'];	
+				
+				$group = Groups::model()->findByAttributes(array('gid' => $iNewgid));
+				$slang=$group['language'];
+				if($sName!='')
+				$group->setAttribute('group_name',$sName);
+				if($sDesc!='')
+				$group->setAttribute('description',$sDesc);
+				$group->save();
+				
+				return "Import OK ".$iNewgid;
+				
+				}		
+			}
+			else
+				throw new Zend_XmlRpc_Server_Exception('No permission', 2);	
+        }		
+	}  
 
     /**
      * XML-RPC routine to import a question into a survey

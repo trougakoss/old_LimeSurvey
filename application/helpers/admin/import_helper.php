@@ -775,7 +775,7 @@ function CSVImportGroup($sFullFilepath, $iNewSID)
 * @param mixed $sFullFilepath  The full filepath of the uploaded file
 * @param mixed $iNewSID The new survey id - the group will always be added after the last group in the survey
 */
-function XMLImportGroup($sFullFilepath, $iNewSID)
+function XMLImportGroup($sFullFilepath, $iNewSID, $sXMLdata=NULL)
 {
     $clang = Yii::app()->lang;
 
@@ -785,7 +785,14 @@ function XMLImportGroup($sFullFilepath, $iNewSID)
     $aLanguagesSupported[]=$sBaseLanguage;     // adds the base language to the list of supported languages
     $aLanguagesSupported=array_merge($aLanguagesSupported,Survey::model()->findByPk($iNewSID)->additionalLanguages);
 
-    $xml = @simplexml_load_file($sFullFilepath);
+    if ($sXMLdata != NULL)
+    {
+        $xml = simplexml_load_string($sXMLdata);
+    } else
+    {
+		$xml = @simplexml_load_file($sFullFilepath);
+	}
+    
     if ($xml==false || $xml->LimeSurveyDocType!='Group') safeDie('This is not a valid LimeSurvey group structure XML file.');
     $iDBVersion = (int) $xml->DBVersion;
     $aQIDReplacements=array();
