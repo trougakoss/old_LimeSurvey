@@ -881,6 +881,55 @@ class remotecontrol_handle
         }				
 	}
 
+  /**
+     * XML-RPC routine to set a property of a group of a survey 
+     * Returns bool 
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $gid
+     * @param string $sproperty_name
+     * @param string $sproperty_value
+     * @return bool
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function set_group_properties($session_key, $gid, $sproperty_name, $sproperty_value)
+	{
+       if ($this->_checkSessionKey($session_key))
+       {
+			$current_group = Groups::model()->findByAttributes(array('gid' => $gid));
+			if (!isset($current_group))
+				throw new Zend_XmlRpc_Server_Exception('Invalid groupid', 22);
+					   
+			if (hasSurveyPermission($current_group->sid, 'survey', 'update'))
+			{				
+				if(!in_array($sproperty_name, array('group_name', 'group_order','group_description','randomization_group','grelevance')))	
+					throw new Zend_XmlRpc_Server_Exception('No such property', 25);
+				
+				$valid_value = $this->_internal_validate($sproperty_name, $sproperty_value);
+				if ($valid_value === false)
+					throw new Zend_XmlRpc_Server_Exception('Update values are not valid', 24);
+		
+				//all dependencies this group has - despite dependencies it can be deleted
+				$dependencies=getGroupDepsForConditions($current_group->sid,$gid);
+				//all dependencies on this group 
+				$depented_on = getGroupDepsForConditions($current_group->sid,"all",$gid,"by-targgid");
+				//We do not allow groups with dependencies to change order - that would lead to broken dependencies
+				if(($dependencies || $depented_on)  && $sproperty_name == 'group_order')
+					throw new Zend_XmlRpc_Server_Exception('You cannot change the order of a group with dependencies', 37);
+				
+				$current_group->setAttribute($sproperty_name,$valid_value);
+				$result = $current_group->save();
+				fixSortOrderGroups($current_group->sid);
+				
+				return $result;
+
+			}
+			else
+				throw new Zend_XmlRpc_Server_Exception('No permission', 2);  	   
+        }				
+	}	
+
     /**
      * XML-RPC routine to import a question into a survey
      *
@@ -1516,7 +1565,26 @@ class remotecontrol_handle
 								'surveyls_dateformat'=>'dateformat',
 								'surveyls_numberformat'=>'numberformat',
 								'template'=>'tmpl',
-								'format'=>'gsa_format'
+								'format'=>'gsa_format',
+								//group  parameters
+								'group_order'=>'int',
+								//question_parameters
+								'other'=>'char',
+								'mandatory'=>'char',
+								'question_order'=>'int',
+								'scale_id'=>'int',
+								'same_default'=>'int',
+								//token parameters
+								'email'=>'email',
+								'remindercount'=>'int',
+								'remindersent'=>'int',
+								'usesleft'=>'int',
+								'validfrom'=>'date',
+								'validuntil'=>'date',
+								'mpid'=>'int',
+								'blacklisted'=>'char',
+								'sent'=>'char',
+								'completed'=>'char'
 								);
 		
 		if (array_key_exists($sparam_name, $validation_categories))
@@ -1593,3 +1661,4 @@ class remotecontrol_handle
 	}
     
 }
+
