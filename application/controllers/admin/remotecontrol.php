@@ -1766,6 +1766,48 @@ class remotecontrol_handle
                 throw new Zend_XmlRpc_Server_Exception('No permission', 2);
         }		
 	}
+  /**
+     * XML-RPC routine to return a property of a token of a survey 
+     * Returns string 
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+	 * @param int $tid
+     * @param string $sproperty_name
+     * @return string
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function get_token_properties($session_key, $sid, $tid, $sproperty_name)
+	{
+       if ($this->_checkSessionKey($session_key))
+       {
+			$surveyidExists = Survey::model()->findByPk($sid);
+			if (!isset($surveyidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);
+			
+			if(!tableExists("{{tokens_$sid}}"))
+				throw new Zend_XmlRpc_Server_Exception('No token table', 11);
+			
+			$current_token = Tokens_dynamic::model($sid)->findByPk($tid);
+			if (!isset($current_token))
+				throw new Zend_XmlRpc_Server_Exception('Invalid tokenid', 22);
+							
+			if (hasSurveyPermission($sid, 'survey', 'read'))
+			{		
+                $abasic_attrs = $current_token->getAttributes();    
+                if(!array_key_exists($sproperty_name,$abasic_attrs))
+					throw new Zend_XmlRpc_Server_Exception('No such property', 25);
+                
+				if (isset($abasic_attrs[$sproperty_name]))
+					return $abasic_attrs[$sproperty_name];
+				else
+					throw new Zend_XmlRpc_Server_Exception('Data not available', 23);							
+			}
+			else
+				throw new Zend_XmlRpc_Server_Exception('No permission', 2);  	   
+        }				
+	}
 
     /**
      * XML-RPC routine to add a participant to a token table
