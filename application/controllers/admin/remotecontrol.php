@@ -811,6 +811,41 @@ class remotecontrol_handle
         }		
 	}  
 
+   /**
+     * XML-RPC routine to return the ids and info  of groups of a survey 
+     * Returns array of ids and info
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @return array
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function get_group_list($session_key, $sid)
+	{
+       if ($this->_checkSessionKey($session_key))
+       {
+			$surveyidExists = Survey::model()->findByPk($sid);		   
+			if (!isset($surveyidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);
+		   
+			if (hasSurveyPermission($sid, 'survey', 'read'))
+			{	
+				$group_list = Groups::model()->findAllByAttributes(array("sid"=>$sid)); 		   
+				if(count($group_list)==0)
+					throw new Zend_XmlRpc_Server_Exception('No groups found', 39);
+				
+				foreach ($group_list as $group)
+				{
+				$aData[]= array('id'=>$group->primaryKey,'group_name'=>$group->attributes['group_name']);
+				}
+				return $aData;					
+			}
+			else
+			throw new Zend_XmlRpc_Server_Exception('No permission', 2);  	   
+        }				
+	}
+
     /**
      * XML-RPC routine to import a question into a survey
      *
