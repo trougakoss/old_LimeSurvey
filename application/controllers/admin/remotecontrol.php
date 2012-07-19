@@ -1676,6 +1676,53 @@ class remotecontrol_handle
         }			
 	}
 	
+   /**
+     * XML-RPC routine to return the ids and info  of tokens of a survey 
+     * Returns array of ids and info
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @return array
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function get_token_list($session_key, $sid)
+	{
+       if ($this->_checkSessionKey($session_key))
+       {
+			$surveyidExists = Survey::model()->findByPk($sid);		   
+			if (!isset($surveyidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);
+
+			
+			if(!tableExists("{{tokens_$sid}}"))
+				throw new Zend_XmlRpc_Server_Exception('No token table', 11);
+
+			 
+			if (hasSurveyPermission($sid, 'tokens', 'read'))
+			{	
+
+				$tokens = Tokens_dynamic::model($sid)->findAll();
+				if(count($tokens)==0)
+					throw new Zend_XmlRpc_Server_Exception('No Tokens found', 30);
+				
+				foreach ($tokens as $token)
+					{
+						$aData[] = array(
+									'tid'=>$token->primarykey,
+									'token'=>$token->attributes['token'],
+									'participant_info'=>array(
+														'firstname'=>$token->attributes['firstname'],
+														'lastname'=>$token->attributes['lastname'],														
+														'email'=>$token->attributes['email'],
+														    ));
+					}
+				return $aData;					
+			}
+			else
+			throw new Zend_XmlRpc_Server_Exception('No permission', 2);  	   
+        }				
+	}
 
     /**
      * XML-RPC routine to add a participant to a token table
