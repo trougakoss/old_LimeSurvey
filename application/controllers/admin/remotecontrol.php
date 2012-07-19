@@ -864,6 +864,59 @@ class remotecontrol_handle
         }				
 	}
 
+   /**
+     * XML-RPC routine to export survey completion data
+     * Returns string - Data
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @return string
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function export_responses($session_key, $sid)
+	{
+		if ($this->_checkSessionKey($session_key))
+        {
+			$surveyidExists = Survey::model()->findByPk($sid);		   
+			if (!isset($surveyidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);
+ 
+            if (hasSurveyPermission($sid, 'respones', 'export'))
+            {   			
+				if(!tableExists("{{survey_$sid}}"))
+					throw new Zend_XmlRpc_Server_Exception('No responses to export', 11);	
+							
+				Yii::app()->loadHelper('admin/exportresults');
+				$explang = getBaseLanguageFromSurveyID($sid);
+
+				$fieldmap = createFieldMap($sid, "short", false, false, $explang);
+				foreach($fieldmap as $key=> $value)
+					$field_names[] = $key;
+
+				$options = new FormattingOptions();
+				//$options->responseMinRecord = 0;
+				//$options->responseMaxRecord = 5;			
+				$options->selectedColumns = $field_names;		
+				$options->responseCompletionState = 'show';
+				$options->headingFormat = 'full';		
+				$option->headerSpacesToUnderscores = false;
+				$options->answerFormat = 'long';		
+				$options->format = 'csv';	
+
+				$resultsService = new ExportSurveyResultsService();
+				$res = $resultsService->exportSurvey($sid, $explang, $options);
+				
+				if (isset($res))
+					return $res;
+				else
+					throw new Zend_XmlRpc_Server_Exception('Could not export responses', 40);			
+			}
+			else
+                throw new Zend_XmlRpc_Server_Exception('No permission', 2);		
+		}	
+	}
+
     /**
      * XML-RPC routing to add a response to the survey table
      * Returns the id of the inserted survey response

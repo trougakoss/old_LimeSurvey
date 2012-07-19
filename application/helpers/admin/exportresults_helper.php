@@ -108,6 +108,9 @@ class ExportSurveyResultsService
 
         $output = $writer->close();
 
+        if(Yii::app()->controller->action->id == 'remotecontrol')
+			return $output;
+			
         if ($options->format == 'csv' || $options->format == 'doc')
         {
             echo $output;
