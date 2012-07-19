@@ -1226,6 +1226,64 @@ class remotecontrol_handle
         }				
 	}
 
+  /**
+     * XML-RPC routine to set a property of a question of a survey 
+     * Returns bool 
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $qid
+     * @param string $sproperty_name
+     * @param string $sproperty_value
+     * @return bool|array
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function set_question_properties($session_key, $qid, $sproperty_name, $sproperty_value)
+	{
+
+       if ($this->_checkSessionKey($session_key))
+       {
+			$current_question = Questions::model()->findByAttributes(array('qid' => $qid));
+			if (!isset($current_question))
+				throw new Zend_XmlRpc_Server_Exception('Invalid questionid', 22);		
+					   
+			if (hasSurveyPermission($current_question->sid, 'survey', 'update'))
+			{				
+				if(!in_array($sproperty_name, array('title', 
+													'question',
+													'preg',
+													'help',
+													'other',
+													'mandatory',
+													'question_order',
+													'scale_id',
+													'same_default',
+													'relevance',
+													)))	
+					throw new Zend_XmlRpc_Server_Exception('No such property', 25);
+				
+				$valid_value = $this->_internal_validate($sproperty_name, $sproperty_value);
+				if ($valid_value === false)
+					throw new Zend_XmlRpc_Server_Exception('Update values are not valid', 24);				
+				
+				//all the dependencies that this question has to other questions
+				$dependencies=getQuestDepsForConditions($current_question->sid,$current_question->gid,$qid);
+				//all dependencies by other questions to this question
+				$is_criteria_question=getQuestDepsForConditions($current_question->sid,$current_question->gid,"all",$qid,"by-targqid");
+				//We do not allow questions with dependencies in the same group to change order - that would lead to broken dependencies
+				if(($dependencies || $is_criteria_question)  && $sproperty_name == 'question_order')
+					throw new Zend_XmlRpc_Server_Exception('You cannot change the order of a question with dependencies', 37);
+		
+				$current_question->setAttribute($sproperty_name,$valid_value);
+				$result = $current_question->save();
+				fixSortOrderQuestions($current_question->gid, $current_question->sid);
+				return $result;
+			}
+			else
+				throw new Zend_XmlRpc_Server_Exception('No permission', 2);  	   
+        }				
+	}	
+
     /**
      * XML-RPC routine to activate a survey
      *
