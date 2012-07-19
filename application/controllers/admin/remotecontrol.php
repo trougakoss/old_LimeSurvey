@@ -1029,6 +1029,88 @@ class remotecontrol_handle
         }		
 	} 
 
+   /**
+     * XML-RPC routine to import a question into a survey from xml string
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @param int $gid
+	 * @param string $sQuestionfile
+	 * @param string $sMandatory 
+	 * @param string $sTitle 
+	 * @param string $sQuestion
+	 * @param string $sHelp
+     * @return string
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function import_question_xml($session_key, $sid, $gid, $sQuestionxml, $sMandatory='N', $sTitle='',$sQuestion='', $sHelp='')
+	{
+		libxml_use_internal_errors(true);
+		$sQuestionxml=htmlspecialchars_decode($sQuestionxml);
+		$xml = simplexml_load_string($sQuestionxml);
+		if(!$xml)
+			throw new Zend_XmlRpc_Server_Exception('This is not a valid LimeSurvey question structure XML file', 21);
+		
+		Yii::app()->loadHelper('admin/import');
+		if ($this->_checkSessionKey($session_key))
+        { 
+			$surveyidExists = Survey::model()->findByPk($sid);
+			if (!isset($surveyidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid Survey id', 22);
+				
+			if($surveyidExists->getAttribute('active') =='Y')
+				throw new Zend_XmlRpc_Server_Exception('Survey is active and not editable', 35);
+				 
+			if($gid!='')
+			{
+				$group = Groups::model()->findByAttributes(array('gid' => $gid));
+				$gsid = $group['sid'];
+				
+				if($gsid != $sid)
+					throw new Zend_XmlRpc_Server_Exception('Missmatch in surveyid and groupid', 21);	
+			}
+			else
+				throw new Zend_XmlRpc_Server_Exception('You need to provide a groupid', 21);			
+				
+			if (hasSurveyPermission($sid, 'survey', 'update'))
+            {
+				$checkImport = XMLImportQuestion(null, $sid, $gid,$sQuestionxml);
+			    fixLanguageConsistency($sid);
+
+				if(array_key_exists('fatalerror',$checkImport))
+					throw new Zend_XmlRpc_Server_Exception($checkImport['fatalerror'], 29);					
+								
+				if($checkImport['newqid']==NULL )
+				{
+					throw new Zend_XmlRpc_Server_Exception('Import failed', 29);
+					exit;
+				}
+				else
+				{
+					$iNewqid = $checkImport['newqid'];
+					
+					$new_question = Questions::model()->findByAttributes(array('sid' => $sid, 'gid' => $gid, 'qid' => $iNewqid));
+					if($sTitle!='')
+						$new_question->setAttribute('title',$sTitle);
+					if($sQuestion!='')
+						$new_question->setAttribute('question',$sQuestion);					
+					if($sHelp!='')
+						$new_question->setAttribute('help',$sHelp);					
+					if(in_array($sMandatory, array('Y','N')))
+						$new_question->setAttribute('mandatory',$sMandatory);
+					else
+						$new_question->setAttribute('mandatory','N');	
+														
+					$new_question->save();
+					return "Import OK ".$iNewqid;
+				}					
+			}
+			else
+				throw new Zend_XmlRpc_Server_Exception('No permission', 2);	
+        }		
+	} 
+
     /**
      * XML-RPC routine to activate a survey
      *

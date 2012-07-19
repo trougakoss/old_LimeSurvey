@@ -1690,7 +1690,7 @@ function CSVImportQuestion($sFullFilepath, $iNewSID, $newgid)
 * @param mixed $iNewSID The new survey id
 * @param mixed $newgid The new question group id -the question will always be added after the last question in the group
 */
-function XMLImportQuestion($sFullFilepath, $iNewSID, $newgid)
+function XMLImportQuestion($sFullFilepath, $iNewSID, $newgid, $sXMLdata=NULL)
 {
     $clang = Yii::app()->lang;
     $aLanguagesSupported = array();  // this array will keep all the languages supported for the survey
@@ -1704,7 +1704,14 @@ function XMLImportQuestion($sFullFilepath, $iNewSID, $newgid)
     $aLanguagesSupported[]=$sBaseLanguage;     // adds the base language to the list of supported languages
     $aLanguagesSupported=array_merge($aLanguagesSupported,Survey::model()->findByPk($iNewSID)->additionalLanguages);
 
-    $xml = simplexml_load_file($sFullFilepath);
+	if ($sXMLdata != NULL)
+    {
+        $xml = simplexml_load_string($sXMLdata);
+    } else
+    {
+		$xml = simplexml_load_file($sFullFilepath);
+	}
+
     if ($xml->LimeSurveyDocType!='Question') safeDie('This is not a valid LimeSurvey question structure XML file.');
     $iDBVersion = (int) $xml->DBVersion;
     $aQIDReplacements=array();
