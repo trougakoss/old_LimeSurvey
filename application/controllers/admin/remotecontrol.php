@@ -1724,6 +1724,49 @@ class remotecontrol_handle
         }				
 	}
 
+  /**
+     * XML-RPC routine to delete a token record  
+     * Returns the id of the deleted token
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @param int $tid
+     * @return int
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function delete_token($session_key, $sid, $tid)
+	{
+        if ($this->_checkSessionKey($session_key))
+        {
+			$sid = sanitize_int($sid);
+			$tid = sanitize_int($tid);
+
+			$surveyidExists = Survey::model()->findByPk($sid);
+			if (!isset($surveyidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);
+			
+			if(!tableExists("{{tokens_$sid}}"))
+				throw new Zend_XmlRpc_Server_Exception('No token table', 11);
+			
+			$tokenidExists = Tokens_dynamic::model($sid)->findByPk($tid);
+			if (!isset($tokenidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid tokenid', 22);
+
+            if (hasSurveyPermission($sid, 'tokens', 'delete'))
+            {
+			Survey_links::deleteTokenLink(array($tid), $sid);
+
+            if(Tokens_dynamic::model($sid)->deleteRecords(array($tid)))
+				return $tid;
+			else
+				 throw new Zend_XmlRpc_Server_Exception('Deletion went wrong', 38);
+            }
+            else
+                throw new Zend_XmlRpc_Server_Exception('No permission', 2);
+        }		
+	}
+
     /**
      * XML-RPC routine to add a participant to a token table
      * Returns the inserted data including additional new information like the Token entry ID and the token
