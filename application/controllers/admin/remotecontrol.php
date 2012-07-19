@@ -282,7 +282,7 @@ class remotecontrol_handle
         }
     } 
 
-    /**
+     /**
      * XML-RPC routine to get survey summary, regarding token usage and survey participation
      * Return integer with the requested value
      * @access public
@@ -295,7 +295,8 @@ class remotecontrol_handle
     {
        $permitted_stats = array();
        if ($this->_checkSessionKey($session_key))
-       { 	  
+       { 
+		   	  
 		$permitted_token_stats = array('token_count', 
 								'token_invalid', 
 								'token_sent', 
@@ -306,58 +307,64 @@ class remotecontrol_handle
 								'incomplete_responses', 
 								'full_responses' 
 								);  
-								
-		if (tableExists('{{tokens_' . $sid . '}}'))
+		$permitted_stats = array_merge($permitted_survey_stats, $permitted_token_stats);						
+		$surveyidExists = Survey::model()->findByPk($sid);		   
+		if (!isset($surveyidExists))
+			throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);	
+			
+		if(in_array($stat_name, $permitted_token_stats))	
 		{
-			$summary = Tokens_dynamic::model($sid)->summary();
-			$permitted_stats = array_merge($permitted_stats, $permitted_token_stats);
+			if (tableExists('{{tokens_' . $sid . '}}'))
+				$summary = Tokens_dynamic::model($sid)->summary();
+			else
+				throw new Zend_XmlRpc_Server_Exception('No available data', 23);
 		}
 		
-		if (tableExists('{{survey_' . $sid . '}}'))
-		{
-			$permitted_stats = array_merge($permitted_stats, $permitted_survey_stats);
-		}		
-											
+		if(in_array($stat_name, $permitted_survey_stats) && !tableExists('{{survey_' . $sid . '}}'))	
+			throw new Zend_XmlRpc_Server_Exception('No available data', 23);
+								
 		if (!in_array($stat_name, $permitted_stats)) 
-		{
-			throw new Zend_XmlRpc_Server_Exception('Data not available', 23);
-			exit;
-		}	
-
-		switch($stat_name) 
-		{
-			case 'token_count':
-				if (isset($summary))
-					return $summary['tkcount'];
-				break;
-			case 'token_invalid':
-				if (isset($summary))
-					return $summary['tkinvalid'];
-				break;	
-			case 'token_sent':
-				if (isset($summary))
-					return $summary['tksent'];
-				break;
-			case 'token_opted_out':
-				if (isset($summary))
-					return $summary['tkoptout'];
-				break;
-			case 'token_completed';
-				if (isset($summary))
-					return $summary['tkcompleted'];
-				break;
-			case 'completed_responses':
-				return Survey_dynamic::model($sid)->count('submitdate IS NOT NULL');
-				break;
-			case 'incomplete_responses':
-				return Survey_dynamic::model($sid)->countByAttributes(array('submitdate' => null));
-				break;
-			case 'full_responses';
-				return Survey_dynamic::model($sid)->count();
-				break;			
-			default:
-				throw new Zend_XmlRpc_Server_Exception('Data is not available', 23);
+			throw new Zend_XmlRpc_Server_Exception('No such property', 23);
+	
+		if (hasSurveyPermission($sid, 'survey', 'read'))
+		{	
+			switch($stat_name) 
+			{
+				case 'token_count':
+					if (isset($summary))
+						return $summary['tkcount'];
+					break;
+				case 'token_invalid':
+					if (isset($summary))
+						return $summary['tkinvalid'];
+					break;	
+				case 'token_sent':
+					if (isset($summary))
+						return $summary['tksent'];
+					break;
+				case 'token_opted_out':
+					if (isset($summary))
+						return $summary['tkoptout'];
+					break;
+				case 'token_completed';
+					if (isset($summary))
+						return $summary['tkcompleted'];
+					break;
+				case 'completed_responses':
+					return Survey_dynamic::model($sid)->count('submitdate IS NOT NULL');
+					break;
+				case 'incomplete_responses':
+					return Survey_dynamic::model($sid)->countByAttributes(array('submitdate' => null));
+					break;
+				case 'full_responses';
+					return Survey_dynamic::model($sid)->count();
+					break;			
+				default:
+					throw new Zend_XmlRpc_Server_Exception('Data is not available', 23);
+			}
 		}
+		else
+		throw new Zend_XmlRpc_Server_Exception('No permission', 2);  		
         }
     } 
 
