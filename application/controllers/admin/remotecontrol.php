@@ -383,50 +383,51 @@ class remotecontrol_handle
 		Yii::app()->loadHelper('admin/import');
 		if ($this->_checkSessionKey($session_key))
         {  
-			$surveyidExists = Survey::model()->findByPk($sid);
-			if (isset($surveyidExists))
-			{
-                throw new Zend_XmlRpc_Server_Exception('Survey already exists', 27);
-				exit;
-			}  
-			//Assuming that surveys should be in the upload/surveys directory
-			$sFullFilepath = Yii::app()->getConfig('uploaddir').'/surveys/'.$sSurveyfile;
-			if ($sSurveyfile!='' && file_exists($sFullFilepath))
-			{	
-				$aPathInfo = pathinfo($sFullFilepath);
-				$sExtension = $aPathInfo['extension'];
+			if (Yii::app()->session['USER_RIGHT_CREATE_SURVEY'])
+			{				
+				$surveyidExists = Survey::model()->findByPk($sid);
+				if (isset($surveyidExists))
+					throw new Zend_XmlRpc_Server_Exception('Survey already exists', 27);
 
-				if (isset($sExtension) && strtolower($sExtension)=='csv')
-				{
-					$aImportResults=CSVImportSurvey($sFullFilepath,$sid);
-				}
-				elseif (isset($sExtension) && strtolower($sExtension)=='lss')
-				{
-					$aImportResults=XMLImportSurvey($sFullFilepath,NULL,NULL,$sid);
+				//Assuming that surveys should be in the upload/surveys directory
+				$sFullFilepath = Yii::app()->getConfig('uploaddir').'/surveys/'.$sSurveyfile;
+				if ($sSurveyfile!='' && file_exists($sFullFilepath))
+				{	
+					$aPathInfo = pathinfo($sFullFilepath);
+					$sExtension = $aPathInfo['extension'];
+
+					if (isset($sExtension) && strtolower($sExtension)=='csv')
+					{
+						$aImportResults=CSVImportSurvey($sFullFilepath,$sid);
+					}
+					elseif (isset($sExtension) && strtolower($sExtension)=='lss')
+					{
+						$aImportResults=XMLImportSurvey($sFullFilepath,NULL,NULL,$sid);
+					}
+					else
+						throw new Zend_XmlRpc_Server_Exception('Invalid input', 21);
+								
+					if(array_key_exists('error',$aImportResults))
+						throw new Zend_XmlRpc_Server_Exception($aImportResults['error'], 29);
+
+					if($aImportResults['newsid']==NULL )
+					{
+						throw new Zend_XmlRpc_Server_Exception('Import failed', 29);
+						exit;
+					}
+					else
+					{
+						$iNewSid = $aImportResults['newsid'];
+						Survey::model()->updateByPk($iNewSid, array('datecreated'=> date("Y-m-d")));
+						return $iNewSid;
+					}			
 				}
 				else
-					throw new Zend_XmlRpc_Server_Exception('Invalid input', 21);
-							
-				if(array_key_exists('error',$aImportResults))
-					throw new Zend_XmlRpc_Server_Exception($aImportResults['error'], 29);
-
-				if($aImportResults['newsid']==NULL )
-				{
-					throw new Zend_XmlRpc_Server_Exception('Import failed', 29);
-					exit;
-				}
-				else
-				{
-					$iNewSid = $aImportResults['newsid'];
-					Survey::model()->updateByPk($iNewSid, array('datecreated'=> date("Y-m-d")));
-					return $iNewSid;
-				}			
+					throw new Zend_XmlRpc_Server_Exception('Survey file does not exist (in server)', 21);
 			}
 			else
-			{
-				throw new Zend_XmlRpc_Server_Exception('Survey file does not exist (in server)', 21);
-				exit;					
-			}
+				throw new Zend_XmlRpc_Server_Exception('No permission', 2);	
+			
         }		
 	} 
 
@@ -445,39 +446,37 @@ class remotecontrol_handle
 		Yii::app()->loadHelper('admin/import');
 		if ($this->_checkSessionKey($session_key))
         {  
-			$surveyidExists = Survey::model()->findByPk($sid);
-			if (isset($surveyidExists))
-			{
-                throw new Zend_XmlRpc_Server_Exception('Survey already exists', 27);
-				exit;
-			}  
-			
-			if ($sXMLdata!='')
-			{	
-				$sXMLdata=htmlspecialchars_decode($sXMLdata);
-				$aImportResults=XMLImportSurvey(NULL,$sXMLdata,NULL,$sid);
+			if (Yii::app()->session['USER_RIGHT_CREATE_SURVEY'])
+			{				
+				$surveyidExists = Survey::model()->findByPk($sid);
+				if (isset($surveyidExists))
+					throw new Zend_XmlRpc_Server_Exception('Survey already exists', 27);
 				
-				if(array_key_exists('error',$aImportResults))
-					throw new Zend_XmlRpc_Server_Exception($aImportResults['error'], 29);					
-				
-				if($aImportResults['newsid']==NULL )
-				{
-					throw new Zend_XmlRpc_Server_Exception('Import failed', 29);
-					exit;
+				if ($sXMLdata!='')
+				{	
+					$sXMLdata=htmlspecialchars_decode($sXMLdata);
+					$aImportResults=XMLImportSurvey(NULL,$sXMLdata,NULL,$sid);
+					
+					if(array_key_exists('error',$aImportResults))
+						throw new Zend_XmlRpc_Server_Exception($aImportResults['error'], 29);					
+					
+					if($aImportResults['newsid']==NULL )
+					{
+						throw new Zend_XmlRpc_Server_Exception('Import failed', 29);
+						exit;
+					}
+					else
+					{
+						$iNewSid = $aImportResults['newsid'];
+						Survey::model()->updateByPk($iNewSid, array('datecreated'=> date("Y-m-d")));
+						return $iNewSid;
+					}		
 				}
 				else
-				{
-					$iNewSid = $aImportResults['newsid'];
-					Survey::model()->updateByPk($iNewSid, array('datecreated'=> date("Y-m-d")));
-					return $iNewSid;
-				}		
+					throw new Zend_XmlRpc_Server_Exception('Insufficient input', 21);
 			}
 			else
-			{
-				throw new Zend_XmlRpc_Server_Exception('Insufficient input', 21);
-				exit;					
-			}
-						
+				throw new Zend_XmlRpc_Server_Exception('No permission', 2);						
         }		
 	} 
 
