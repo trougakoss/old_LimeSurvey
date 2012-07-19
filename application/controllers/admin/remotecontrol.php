@@ -1111,6 +1111,72 @@ class remotecontrol_handle
         }		
 	} 
 
+  /**
+     * XML-RPC routine to delete a question of a survey 
+     * Returns the id of the deleted question
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @param int $gid
+     * @param int qid
+     * @return string
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function delete_question($session_key, $sid, $gid, $qid)
+	{
+        if ($this->_checkSessionKey($session_key))
+        {
+			$sid = sanitize_int($sid);
+			$gid = sanitize_int($gid);
+			$qid = sanitize_int($qid);			
+			$surveyidExists = Survey::model()->findByPk($sid);
+			if (!isset($surveyidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);
+        		   
+			$groupidExists = Groups::model()->findByAttributes(array('gid' => $gid));
+			if (!isset($groupidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid groupid', 22);
+
+			$questionidExists = Questions::model()->findByAttributes(array('qid' => $qid));
+			if (!isset($questionidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid questionid', 22);
+		
+			if($surveyidExists['active']=='Y')
+				throw new Zend_XmlRpc_Server_Exception('Survey is active and not editable', 35);	
+							
+            if (hasSurveyPermission($sid, 'surveycontent', 'delete'))
+            {
+				$ccresult = Conditions::model()->findAllByAttributes(array('cqid' => $qid));
+				if(count($ccresult)>0)
+					throw new Zend_XmlRpc_Server_Exception('Cannot delete Question. There are conditions for other questions that rely on this question ', 37);
+				
+				$row = Questions::model()->findByAttributes(array('qid' => $qid))->attributes;
+				if ($row['gid']!=$gid)
+					throw new Zend_XmlRpc_Server_Exception('Missmatch in groupid and questionid', 21);	
+
+				LimeExpressionManager::RevertUpgradeConditionsToRelevance(NULL,$qid);
+
+                Conditions::model()->deleteAllByAttributes(array('qid' => $qid));
+                Question_attributes::model()->deleteAllByAttributes(array('qid' => $qid));
+                Answers::model()->deleteAllByAttributes(array('qid' => $qid));
+
+                $criteria = new CDbCriteria;
+                $criteria->addCondition('qid = :qid or parent_qid = :qid');
+                $criteria->params[':qid'] = $qid;
+                Questions::model()->deleteAll($criteria);
+
+                Defaultvalues::model()->deleteAllByAttributes(array('qid' => $qid));
+                Quota_members::model()->deleteAllByAttributes(array('qid' => $qid));
+                Questions::updateSortOrder($gid, $sid);
+ 
+                return "Deleted ".$qid;
+            }
+            else
+                throw new Zend_XmlRpc_Server_Exception('No permission', 2);
+        }		
+	}
+
     /**
      * XML-RPC routine to activate a survey
      *
