@@ -611,6 +611,59 @@ class remotecontrol_handle
 			
 		}
 	} 
+
+   /**
+     * XML-RPC routine to delete a group of a survey 
+     * Returns the id of the deleted group
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @param int $gid
+     * @return int
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function delete_group($session_key, $sid, $gid)
+	{
+        if ($this->_checkSessionKey($session_key))
+        {
+			$sid = sanitize_int($sid);
+			$gid = sanitize_int($gid);
+			$surveyidExists = Survey::model()->findByPk($sid);
+			if (!isset($surveyidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);
+           		   
+			$groupidExists = Groups::model()->findByAttributes(array('gid' => $gid));
+			if (!isset($groupidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid groupid', 22);
+		   
+			if($surveyidExists['active']=='Y')
+				throw new Zend_XmlRpc_Server_Exception('Survey is active and not editable', 35);
+
+            if (hasSurveyPermission($sid, 'surveycontent', 'delete'))
+            {
+				//Check what dependencies exist for current group
+				//$dependencies=getGroupDepsForConditions($current_group->sid,"all",$gid,"by-targgid");
+
+				LimeExpressionManager::RevertUpgradeConditionsToRelevance($sid);
+				$iGroupsDeleted = Groups::deleteWithDependency($gid, $sid);
+				
+				if ($iGroupsDeleted === 1)
+					fixSortOrderGroups($sid);
+					
+				LimeExpressionManager::UpgradeConditionsToRelevance($sid);
+
+				if ($iGroupsDeleted === 1)
+				{
+					return $gid;
+				}
+				else
+					throw new Zend_XmlRpc_Server_Exception('Group deletion failed', 37);
+            }
+            else
+                throw new Zend_XmlRpc_Server_Exception('No permission', 2);
+        }		
+	}
   
     /**
      * XML-RPC routine to import a group into a survey
@@ -689,6 +742,8 @@ class remotecontrol_handle
 				throw new Zend_XmlRpc_Server_Exception('No permission', 2);	
         }		
 	}      
+
+
 
     /**
      * XML-RPC routine to import a question into a survey
