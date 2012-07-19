@@ -1284,6 +1284,57 @@ class remotecontrol_handle
         }				
 	}	
 
+   /**
+     * XML-RPC routine to return the ids and info  of questions of a survey/group 
+     * Returns array of ids and info
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @param int $gid
+     * @return array
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function get_question_list($session_key, $sid, $gid='')
+	{
+       if ($this->_checkSessionKey($session_key))
+       {
+			$surveyidExists = Survey::model()->findByPk($sid);		   
+			if (!isset($surveyidExists))
+			{
+				throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);
+				exit;
+			}
+	   
+			if (hasSurveyPermission($sid, 'survey', 'read'))
+			{	
+				if($gid!='')
+				{
+					$group = Groups::model()->findByAttributes(array('gid' => $gid));
+					$gsid = $group['sid'];
+					
+					if($gsid != $sid)
+						throw new Zend_XmlRpc_Server_Exception('Missmatch in surveyid and groupid', 21);	
+					else
+						$question_list = Questions::model()->findAllByAttributes(array("sid"=>$sid, "gid"=>$gid));
+				}
+				else
+					$question_list = Questions::model()->findAllByAttributes(array("sid"=>$sid));
+	   
+				if(count($question_list)==0)
+					throw new Zend_XmlRpc_Server_Exception('No questions found', 39);
+				
+				foreach ($question_list as $question)
+				{
+				$aData[]= array('id'=>$question->primaryKey,'type'=>$question->attributes['type'], 'question'=>$question->attributes['question']);
+				}
+				return $aData;					
+			}
+			else
+			throw new Zend_XmlRpc_Server_Exception('No permission', 2);  	   
+        }				
+	}
+
     /**
      * XML-RPC routine to activate a survey
      *
