@@ -1809,6 +1809,68 @@ class remotecontrol_handle
         }				
 	}
 
+ /**
+     * XML-RPC routine to set a property of a token of a survey 
+     * Returns bool 
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $sid
+     * @param int $tid
+     * @param string $sproperty_name
+     * @param string $sproperty_value
+     * @return bool
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function set_token_properties($session_key, $sid, $tid, $sproperty_name, $sproperty_value)
+	{
+       if ($this->_checkSessionKey($session_key))
+       {
+			$surveyidExists = Survey::model()->findByPk($sid);		   
+			if (!isset($surveyidExists))
+				throw new Zend_XmlRpc_Server_Exception('Invalid surveyid', 22);			
+			
+			if(!tableExists("{{tokens_$sid}}"))
+				throw new Zend_XmlRpc_Server_Exception('No token table', 11);
+			
+			$current_token = Tokens_dynamic::model($sid)->findByPk($tid);
+			if (!isset($current_token))
+				throw new Zend_XmlRpc_Server_Exception('Invalid tokenid', 22);			
+					   
+			if (hasSurveyPermission($sid, 'tokens', 'update'))
+			{				
+				
+				if(!in_array($sproperty_name, array('firstname',
+													'lastname',
+													'email',
+													'emailstatus',
+													'token',
+													'blacklisted',
+													'sent',
+													'remindersent',
+													'remindercount',
+													'completed',
+													'usesleft',
+													'validfrom',
+													'validuntil',
+													'mpid'
+													)))	
+					throw new Zend_XmlRpc_Server_Exception('No such property', 25);
+				
+				$valid_value = $this->_internal_validate($sproperty_name, $sproperty_value);
+				if ($valid_value === false)
+					throw new Zend_XmlRpc_Server_Exception('Update values are not valid', 24);
+		
+				$current_token->setAttribute($sproperty_name,$valid_value);
+				$result = $current_token->save();
+
+				return $result;
+			}
+			else
+				throw new Zend_XmlRpc_Server_Exception('No permission', 2);  	   
+        }				
+	}
+
     /**
      * XML-RPC routine to add a participant to a token table
      * Returns the inserted data including additional new information like the Token entry ID and the token
