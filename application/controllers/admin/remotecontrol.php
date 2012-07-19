@@ -1177,6 +1177,55 @@ class remotecontrol_handle
         }		
 	}
 
+  /**
+     * XML-RPC routine to return a property of a question of a survey 
+     * Returns string 
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $qid
+     * @param string $sproperty_name
+     * @return string|array
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function get_question_properties($session_key, $qid, $sproperty_name)
+	{
+       if ($this->_checkSessionKey($session_key))
+       {
+			$current_question = Questions::model()->findByAttributes(array('qid' => $qid));
+			if (!isset($current_question))
+				throw new Zend_XmlRpc_Server_Exception('Invalid questionid', 22);
+					   	   
+			if (hasSurveyPermission($current_question->sid, 'survey', 'read'))
+			{		
+                $abasic_attrs = $current_question->getAttributes();  
+                
+                if ($sproperty_name == 'available_answers')
+                {
+					$subgroups =  Questions::model()->findAllByAttributes(array('parent_qid' => $qid),array('order'=>'title') );
+					if (count($subgroups)>0)
+					{
+					foreach($subgroups as $subgroup)
+						$aData[$subgroup['title']]= $subgroup['question'];
+					return $aData;
+					}
+					else
+						throw new Zend_XmlRpc_Server_Exception('No available answers', 23);
+				}
+                  
+                if(!array_key_exists($sproperty_name,$abasic_attrs))
+					throw new Zend_XmlRpc_Server_Exception('No such property', 25);
+                
+				if (isset($abasic_attrs[$sproperty_name]))
+					return $abasic_attrs[$sproperty_name];
+				else
+					throw new Zend_XmlRpc_Server_Exception('Data not available', 23);							
+			}
+			else
+				throw new Zend_XmlRpc_Server_Exception('No permission', 2);  	   
+        }				
+	}
+
     /**
      * XML-RPC routine to activate a survey
      *
