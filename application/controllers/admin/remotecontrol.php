@@ -845,6 +845,41 @@ class remotecontrol_handle
 			throw new Zend_XmlRpc_Server_Exception('No permission', 2);  	   
         }				
 	}
+	
+  /**
+     * XML-RPC routine to return a property of a group of a survey 
+     * Returns string 
+     *
+     * @access public
+     * @param string $session_key
+     * @param int $gid
+     * @param string $sproperty_name
+     * @return string
+     * @throws Zend_XmlRpc_Server_Exception
+     */
+	public function get_group_properties($session_key, $gid, $sproperty_name)
+	{
+       if ($this->_checkSessionKey($session_key))
+       {
+			$current_group = Groups::model()->findByAttributes(array('gid' => $gid));
+			if (!isset($current_group))
+				throw new Zend_XmlRpc_Server_Exception('Invalid groupid', 22);
+					   
+			if (hasSurveyPermission($current_group->sid, 'survey', 'read'))
+			{		
+                $abasic_attrs = $current_group ->getAttributes();
+				if(!array_key_exists($sproperty_name,$abasic_attrs))
+					throw new Zend_XmlRpc_Server_Exception('No such property', 25);
+				
+				if (isset($abasic_attrs[$sproperty_name]))
+					return $abasic_attrs[$sproperty_name];
+				else
+					throw new Zend_XmlRpc_Server_Exception('Data not available', 23);							
+			}
+			else
+				throw new Zend_XmlRpc_Server_Exception('No permission', 2);  	   
+        }				
+	}
 
     /**
      * XML-RPC routine to import a question into a survey
